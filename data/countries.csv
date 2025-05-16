@@ -1,0 +1,197 @@
+country_id,country_name,iso_code,region_id
+1,Canada,CAN,6
+2,United States,USA,6
+3,Angola,AGO,1
+4,Burundi,BDI,1
+5,Benin,BEN,1
+6,Burkina Faso,BFA,1
+7,Botswana,BWA,1
+8,Central African Republic,CAF,1
+9,Ivory Coast,CIV,1
+10,Cameroon,CMR,1
+11,DR Congo,COD,1
+12,Congo,COG,1
+13,Comoros,COM,1
+14,Cape Verde,CPV,1
+15,Djibouti,DJI,1
+16,Algeria,DZA,1
+17,Egypt,EGY,1
+18,Eritrea,ERI,1
+19,Western Sahara,ESH,1
+20,Ethiopia,ETH,1
+21,Gabon,GAB,1
+22,Ghana,GHA,1
+23,Guinea,GIN,1
+24,Gambia,GMB,1
+25,Guinea-Bissau,GNB,1
+26,Equatorial Guinea,GNQ,1
+27,Kenya,KEN,1
+28,Liberia,LBR,1
+29,Libya,LBY,1
+30,Lesotho,LSO,1
+31,Morocco,MAR,1
+32,Madagascar,MDG,1
+33,Mali,MLI,1
+34,Mozambique,MOZ,1
+35,Mauritania,MRT,1
+36,Mauritius,MUS,1
+37,Malawi,MWI,1
+38,Mayotte,MYT,1
+39,Namibia,NAM,1
+40,Niger,NER,1
+41,Nigeria,NGA,1
+42,Reunion,REU,1
+43,Rwanda,RWA,1
+44,Sudan,SDN,1
+45,Senegal,SEN,1
+46,Sierra Leone,SLE,1
+47,Somalia,SOM,1
+48,South Sudan,SSD,1
+49,Sao Tome & Principe,STP,1
+50,Swaziland,SWZ,1
+51,Chad,TCD,1
+52,Togo,TGO,1
+53,Tunisia,TUN,1
+54,Tanzania,TZA,1
+55,Uganda,UGA,1
+56,South Africa,ZAF,1
+57,Zambia,ZMB,1
+58,Zimbabwe,ZWE,1
+59,Albania,ALB,3
+60,Austria,AUT,3
+61,Belgium,BEL,3
+62,Bulgaria,BGR,3
+63,Bosnia & Herzegovina,BIH,3
+64,Switzerland,CHE,3
+65,Channel Islands,CHI,3
+66,Czech Republic,CZE,3
+67,Germany,DEU,3
+68,Denmark,DNK,3
+69,Spain,ESP,3
+70,Finland,FIN,3
+71,France,FRA,3
+72,United Kingdom,GBR,3
+73,Greece,GRC,3
+74,Croatia,HRV,3
+75,Hungary,HUN,3
+76,Ireland,IRL,3
+77,Iceland,ISL,3
+78,Italy,ITA,3
+79,Luxembourg,LUX,3
+80,Macedonia,MKD,3
+81,Malta,MLT,3
+82,Montenegro,MNE,3
+83,Netherlands,NLD,3
+84,Norway,NOR,3
+85,Poland,POL,3
+86,Portugal,PRT,3
+87,Romania,ROU,3
+88,Serbia,SRB,3
+89,Slovakia,SVK,3
+90,Slovenia,SVN,3
+91,Sweden,SWE,3
+92,Armenia,ARM,4
+93,Azerbaijan,AZE,4
+94,Belarus,BLR,4
+95,Estonia,EST,4
+96,Georgia,GEO,4
+97,Kazakhstan,KAZ,4
+98,Kyrgyzstan,KGZ,4
+99,Lithuania,LTU,4
+100,Latvia,LVA,4
+101,Moldova,MDA,4
+102,Russia,RUS,4
+103,Tajikistan,TJK,4
+104,Turkmenistan,TKM,4
+105,Ukraine,UKR,4
+106,Uzbekistan,UZB,4
+107,United Arab Emirates,ARE,10
+108,Bahrain,BHR,10
+109,Cyprus,CYP,10
+110,Iraq,IRQ,10
+111,Israel,ISR,10
+112,Jordan,JOR,10
+113,Kuwait,KWT,10
+114,Lebanon,LBN,10
+115,Oman,OMN,10
+116,Palestine,PSE,10
+117,Qatar,QAT,10
+118,Saudi Arabia,SAU,10
+119,Syria,SYR,10
+120,Turkey,TUR,10
+121,Yemen,YEM,10
+122,Afghanistan,AFG,8
+123,Bangladesh,BGD,8
+124,Bhutan,BTN,8
+125,India,IND,8
+126,Iran,IRN,8
+127,Sri Lanka,LKA,8
+128,Maldives,MDV,8
+129,Nepal,NPL,8
+130,Pakistan,PAK,8
+131,China,CHN,2
+132,Hong Kong,HKG,2
+133,Japan,JPN,2
+134,South Korea,KOR,2
+135,Macao,MAC,2
+136,Mongolia,MNG,2
+137,North Korea,PRK,2
+138,Brunei,BRN,9
+139,Indonesia,IDN,9
+140,Cambodia,KHM,9
+141,Laos,LAO,9
+142,Myanmar,MMR,9
+143,Malaysia,MYS,9
+144,Philippines,PHL,9
+145,Singapore,SGP,9
+146,Thailand,THA,9
+147,Timor-Leste,TLS,9
+148,Vietnam,VNM,9
+149,Australia,AUS,7
+150,Fiji,FJI,7
+151,Micronesia,FSM,7
+152,Guam,GUM,7
+153,New Caledonia,NCL,7
+154,New Zealand,NZL,7
+155,Papua New Guinea,PNG,7
+156,French Polynesia,PYF,7
+157,Solomon Islands,SLB,7
+158,Tonga,TON,7
+159,Vanuatu,VUT,7
+160,Samoa,WSM,7
+161,Aruba,ABW,5
+162,Argentina,ARG,5
+163,Bahamas,BHS,5
+164,Belize,BLZ,5
+165,Bolivia,BOL,5
+166,Brazil,BRA,5
+167,Barbados,BRB,5
+168,Chile,CHL,5
+169,Colombia,COL,5
+170,Costa Rica,CRI,5
+171,Cuba,CUB,5
+172,Dominican Republic,DOM,5
+173,Ecuador,ECU,5
+174,Guadeloupe,GLP,5
+175,Grenada,GRD,5
+176,Guatemala,GTM,5
+177,French Guiana,GUF,5
+178,Guyana,GUY,5
+179,Honduras,HND,5
+180,Haiti,HTI,5
+181,Jamaica,JAM,5
+182,Saint Lucia,LCA,5
+183,Mexico,MEX,5
+184,Martinique,MTQ,5
+185,Nicaragua,NIC,5
+186,Panama,PAN,5
+187,Peru,PER,5
+188,Puerto Rico,PRI,5
+189,Paraguay,PRY,5
+190,El Salvador,SLV,5
+191,Suriname,SUR,5
+192,Trinidad & Tobago,TTO,5
+193,Uruguay,URY,5
+194,Saint Vincent & Grenadines,VCT,5
+195,Venezuela,VEN,5
+196,Virgin Islands,VIR,5
