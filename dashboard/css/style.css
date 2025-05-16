@@ -1,0 +1,176 @@
+/* Basic Reset & Body Styling */
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #eef1f5; /* Light grey-blue background */
+    color: #333;
+    line-height: 1.6;
+    height: 100%; /* Full height */
+    display: flex;
+    flex-direction: column; /* Stack header, dashboard, footer vertically */
+}
+
+header {
+    background-color: #2c3e50; /* Dark blue */
+    color: #ecf0f1; /* Light grey text */
+    padding: 1rem 20px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 10; /* Ensure header is above other content if overlapping occurs */
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.8em;
+    font-weight: 300;
+}
+
+/* Dashboard Layout using Flexbox */
+.dashboard-container {
+    display: flex;
+    flex-grow: 1; /* Allows container to fill remaining vertical space */
+    padding: 20px;
+    gap: 20px; /* Space between sidebar and main content */
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden; /* Prevent scrollbars on the container itself */
+}
+
+.sidebar {
+    flex: 1; /* Takes up 1 part of the available space (e.g., 33%) */
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* Space between charts in the sidebar */
+    min-width: 320px; /* Minimum width for the sidebar */
+    max-width: 450px; /* Optional: maximum width */
+}
+
+.main-content {
+    flex: 2.5; /* Takes up 2.5 parts of the available space (e.g., 67%), making it larger */
+    display: flex; /* To allow map-container to fill it */
+    min-width: 0; /* Important for flex items to shrink properly */
+}
+
+/* Individual Chart/Map Containers */
+.chart-container,
+.map-container {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Important for SVG/Canvas to not overflow its container */
+}
+
+.sidebar .chart-container {
+    flex-grow: 1; /* Each chart container in sidebar tries to take equal space */
+    min-height: 300px; /* Minimum height for sidebar charts */
+}
+
+
+.map-container {
+    flex-grow: 1; /* Map container fills the main content area */
+}
+
+.chart-container h2,
+.map-container h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #34495e; /* Darker blue-grey */
+    text-align: center;
+    border-bottom: 1px solid #ecf0f1; /* Light separator line */
+    padding-bottom: 10px;
+}
+
+/* SVG/Canvas Placeholder Styling (D3 will draw into these) */
+#line-chart,
+#chord-diagram,
+#map-visualization {
+    width: 100%;
+    height: 100%; 
+    flex-grow: 1; /* Allows the div to grow and fill its parent chart-container */
+    min-height: 250px; /* Minimum drawing area, adjust as needed */
+    display: flex; /* Helps with centering content if SVG is smaller */
+    align-items: center;
+    justify-content: center;
+}
+
+/* Ensure SVGs within these divs take up space */
+#line-chart svg,
+#chord-diagram svg,
+#map-visualization svg {
+    display: block; /* Removes extra space below inline SVGs */
+    max-width: 100%;
+    max-height: 100%;
+}
+
+
+/* Tooltip Styling (Example for map or other charts) */
+.tooltip {
+    position: absolute; /* Crucial for positioning next to cursor/element */
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: rgba(44, 62, 80, 0.9); /* Dark translucent background */
+    color: #ecf0f1; /* Light text */
+    border: none;
+    border-radius: 4px;
+    pointer-events: none; /* So it doesn't interfere with mouse events on the SVG */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    white-space: nowrap; /* Prevent line breaks in simple tooltips */
+    z-index: 20; /* Ensure tooltip is above other elements */
+}
+
+footer {
+    background-color: #2c3e50;
+    color: #bdc3c7; /* Lighter grey for footer text */
+    text-align: center;
+    padding: 0.8rem 20px;
+    font-size: 0.85em;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Optional: Style for map country shapes for better visual feedback */
+.country-shape {
+    transition: fill 0.2s ease-in-out; /* Smooth fill transition on hover */
+}
+
+/* Responsive adjustments (Example) */
+@media (max-width: 900px) { /* Adjust breakpoint as needed */
+    .dashboard-container {
+        flex-direction: column;
+        overflow-y: auto; /* Allow scrolling on smaller screens if content overflows */
+    }
+
+    .sidebar, .main-content {
+        flex: none; /* Reset flex grow/shrink */
+        width: 100%;
+        max-width: none; /* Remove max-width constraint for sidebar */
+    }
+
+    .sidebar .chart-container {
+        min-height: 350px; /* Give a bit more height on mobile */
+    }
+    .map-container {
+        min-height: 400px; /* Ensure map has decent height */
+    }
+}
+
+@media (max-width: 480px) {
+    header h1 {
+        font-size: 1.5em;
+    }
+    .chart-container h2,
+    .map-container h2 {
+        font-size: 1em;
+    }
+    .tooltip {
+        font-size: 11px;
+    }
+}

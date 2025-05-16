@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migration Flows Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Global Migration Flows Dashboard</h1>
+    </header>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="chart-container" id="line-chart-container">
+                <h2>Flows Over Time</h2>
+                <div id="line-chart">
+                    <!-- D3.js Line Chart will be rendered here -->
+                </div>
+            </div>
+            <div class="chart-container" id="chord-diagram-container">
+                <h2>Regional Flow Relationships</h2>
+                <div id="chord-diagram">
+                    <!-- D3.js Chord Diagram will be rendered here -->
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="map-container" id="map-container">
+                <h2>Interactive Migration Map</h2>
+                <div id="map-visualization">
+                    <!-- D3.js Map will be rendered here -->
+                </div>
+                <!-- Tooltip div for the map, initially hidden -->
+                <div id="map-tooltip" class="tooltip" style="opacity:0;">Tooltip</div>
+            </div>
+        </main>
+    </div>
+
+    <footer>
+        <p>Data Visualization Project - [Your Class/Group Name] - [Year]</p>
+    </footer>
+
+    <!-- D3.js Library (ensure this is the correct version or the one you prefer) -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson@3"></script>
+
+    <!-- Your D3.js scripts (order can matter if one depends on another, main.js usually last or loads others) -->
+    <script src="js/line_chart.js"></script>
+    <script src="js/chord_diagram.js"></script>
+    <script src="js/map_viz.js"></script>
+    <script src="js/main.js"></script> <!-- Main script to orchestrate data loading and interactions -->
+</body>
+</html>

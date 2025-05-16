@@ -3,7 +3,7 @@ import pandas as pd
 # Load the CSV file
 # Assuming 'data/data.csv' is the correct path to your input file
 try:
-    df = pd.read_csv("data/data.csv")
+    df = pd.read_csv("data/raw_data.csv")
 except FileNotFoundError:
     print("Error: data/data.csv not found. Please ensure the file exists in the 'data' subdirectory.")
     exit()
