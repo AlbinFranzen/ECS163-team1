@@ -11,6 +11,16 @@
         <h1>Global Migration Flows Dashboard</h1>
     </header>
 
+    <div class="dashboard-intro">
+        <p>
+            This dashboard visualizes international migration patterns between countries and regions
+            for the periods 1990-1995, 1995-2000, 2000-2005, and 2005-2010.
+            Click on a country on the map to see its specific migration flows and trends.
+            The line chart displays flows over time, and the chord diagram illustrates
+            inter-regional relationships.
+        </p>
+    </div>
+
     <div class="dashboard-container">
         <aside class="sidebar">
             <div class="chart-container" id="line-chart-container">
@@ -40,17 +50,18 @@
     </div>
 
     <footer>
-        <p>Data Visualization Project - [Your Class/Group Name] - [Year]</p>
+        <p>ECS163 Data Visualization Project - Team 1</p>
+        <p><small>Flow data from: Abel & Sander (2014) </small></p>
     </footer>
 
-    <!-- D3.js Library (ensure this is the correct version or the one you prefer) -->
+    <!-- D3.js Library -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/topojson@3"></script>
 
-    <!-- Your D3.js scripts (order can matter if one depends on another, main.js usually last or loads others) -->
+    <!-- Your D3.js scripts -->
     <script src="js/line_chart.js"></script>
     <script src="js/chord_diagram.js"></script>
     <script src="js/map_viz.js"></script>
-    <script src="js/main.js"></script> <!-- Main script to orchestrate data loading and interactions -->
+    <script src="js/main.js"></script>
 </body>
 </html>
