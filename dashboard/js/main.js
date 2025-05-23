@@ -11,6 +11,9 @@ const assetsPath = 'assets/';
 let allData = {};
 let dataLoaded = false; // Flag to check if data has been loaded
 
+window.currentPeriod = '1990';   // default
+const allPeriods   = ['1990','1995','2000','2005'];
+
 async function loadDataAndInit() {
     if (dataLoaded) {
         console.log("Data already loaded and initialized.");
