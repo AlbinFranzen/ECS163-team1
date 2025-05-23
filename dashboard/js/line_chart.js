@@ -127,7 +127,10 @@ function drawLineChartPlot(data, title, lineColor = "steelblue", append = false)
             lineChartSvg.select(".y-axis").transition().duration(300).call(d3.axisLeft(lineChartYScale).ticks(5).tickFormat(d3.format(".2s")));
         }
          // Update title if appending a new line type
-        lineChartSvg.select(".chart-title").text(currentTitle => currentTitle.split(" - ")[0] + " - In/Outflow");
+        const baseTitle = title.split(" - ")[0];
+    lineChartSvg
+      .select(".chart-title")
+      .text(`${baseTitle} - In/Outflow`);
     }
 
 

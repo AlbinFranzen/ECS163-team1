@@ -107,6 +107,20 @@ header h1 {
     line-height: 1.7;
 }
 
+.explanation-box {
+ position: absolute;
+ top: 60px;            /* just below header */
+ left: 50%;
+ transform: translateX(-50%);
+ max-width: 800px;
+ background: rgba(255,255,255,0.95);
+ border: 1px solid #aaa;
+ padding: 10px 20px;
+ font-size: 14px;
+ box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+ z-index: 100;
+}
+
 /* Footer */
 footer {
     background-color: #2c3e50;
