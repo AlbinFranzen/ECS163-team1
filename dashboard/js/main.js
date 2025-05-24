@@ -12,7 +12,7 @@ let dataLoaded = false; // Flag to check if CSV/JSON data has been loaded
 // Current period for charts
 window.currentPeriod = '1990';   
 const allPeriods   = ['1990','1995','2000','2005'];
-
+let lastSelectedFeature = null;
 // ============================================================================
 // 1) Load the SQLite database via sql.js once at startup
 //    (Requires <script src="sql-wasm.js"> in your HTML <head>)
@@ -113,6 +113,7 @@ function handleCountrySelection(clickedMapFeature) {
   }
   const mapCountryName       = clickedMapFeature.properties.name;
   const mapCountryIdNumeric  = +clickedMapFeature.id;
+  lastSelectedFeature = clickedMapFeature;
 
   // Match by name (ensure countries.csv has a country_name column)
   const selectedCountry = allData.countries.find(
@@ -162,3 +163,32 @@ function handleCountrySelection(clickedMapFeature) {
       console.error('SQLite error:', err);
     });
 }
+
+// --- period buttons wiring ---
+    function initPeriodButtons() {
+      const container = d3.select('#period-buttons');
+      container.selectAll('button')
+        .on('click', (event, d) => {
+          // set global
+          window.currentPeriod = event.currentTarget.dataset.period;
+          // highlight active
+          container.selectAll('button').classed('active', false);
+          d3.select(event.currentTarget).classed('active', true);
+          // re-draw chord
+          if (typeof initChordDiagram === 'function') {
+            initChordDiagram(allData.regionFlows, allData.regions);
+          }
+          // re-draw map flow for last selected
+          if (lastSelectedFeature && typeof drawFlowsForSelectedCountry === 'function') {
+            drawFlowsForSelectedCountry(lastSelectedFeature);
+          }
+        });
+      // mark initial
+      container.select(`button[data-period="${window.currentPeriod}"]`)
+        .classed('active', true);
+    }
+
+    // after page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      initPeriodButtons();
+    });

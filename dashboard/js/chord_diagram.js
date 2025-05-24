@@ -27,7 +27,7 @@ function initChordDiagram(regionFlowData, regionData) {
     regionFlowData.forEach(flow => {
         if (flow.from_region_id && flow.to_region_id && flow.from_region_id !== flow.to_region_id) { // Exclude self-loops for clarity
             const key = `${flow.from_region_id}-${flow.to_region_id}`;
-            const totalFlow = (flow.flow_1990 || 0) + (flow.flow_1995 || 0) + (flow.flow_2000 || 0) + (flow.flow_2005 || 0);
+            const totalFlow = flow[`flow_${window.currentPeriod}`] || 0;
             aggregatedFlows[key] = (aggregatedFlows[key] || 0) + totalFlow;
         }
     });

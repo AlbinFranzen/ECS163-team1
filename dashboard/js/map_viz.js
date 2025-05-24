@@ -207,7 +207,7 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
             targetCountryCSVId = flow.from_country_id;
             isOutflow = false;
         }
-        flowValue = (flow.flow_1990 || 0) + (flow.flow_1995 || 0) + (flow.flow_2000 || 0) + (flow.flow_2005 || 0);
+        flowValue = flow[`flow_${window.currentPeriod}`] || 0;
 
         if (flowValue <= 0 || targetCountryCSVId === selectedCountryIdForFlows) return; // No flow or self-loop
 

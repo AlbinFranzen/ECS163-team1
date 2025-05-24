@@ -121,6 +121,23 @@ header h1 {
  z-index: 100;
 }
 
+  .period-buttons {
+      text-align: center;
+      margin: 10px 0;
+    }
+    .period-buttons button {
+      margin: 0 5px;
+      padding: 6px 12px;
+      background: #ddd;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .period-buttons button.active,
+    .period-buttons button:hover {
+      background: #bbb;
+    }
+
 /* Footer */
 footer {
     background-color: #2c3e50;
