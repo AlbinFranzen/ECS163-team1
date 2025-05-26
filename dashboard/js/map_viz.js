@@ -120,9 +120,11 @@ function initMap(countryFlows, countries, geoData) {
             .attr("stroke-width", 3)
             .style("pointer-events", "all")
             .on("mouseover", function() {
-                d3.select(this)
-                    .attr("fill", `${regionColor}33`) // Add 33 for 20% opacity
-                    .attr("stroke-width", 4);
+                if (selectedRegion !== regionId) {
+                    d3.select(this)
+                        .attr("fill", `${regionColor}33`)
+                        .attr("stroke-width", 4);
+                }
             })
             .on("mouseout", function() {
                 if (selectedRegion !== regionId) {
@@ -141,20 +143,55 @@ function initMap(countryFlows, countries, geoData) {
 }
 
 function handleRegionClick(regionId, element, regionColor) {
-    // Select new region
-    selectedRegion = regionId;
-    
-    // Update region visual
-    d3.select(element)
-        .attr("fill", `${regionColor}33`) // Add 33 for 20% opacity
-        .attr("stroke-width", 4);
-    
-    // Enable interactions only for countries in this region
-    mapSvg.selectAll("path.country-shape")
-        .style("pointer-events", function(d) {
-            const country = mapCountryDataCache.find(c => c.country_name === d.properties.name);
-            return country && country.region_id === +regionId ? "all" : "none";
-        });
+    if (selectedRegion === regionId) {
+        // Deselect region
+        selectedRegion = null;
+        d3.select(element)
+            .attr("fill", "transparent")
+            .attr("stroke-width", 3);
+        
+        // Reset country interactions
+        mapSvg.selectAll("path.country-shape")
+            .style("pointer-events", "none");
+        
+        // Clear selected country if any
+        if (selectedCountry) {
+            selectedCountry = null;
+            mapSvg.selectAll("path.country-shape")
+                .classed("selected-country", false)
+                .attr("fill", "#f0e6d2");
+            mapSvg.select("g#flow-lines").selectAll("*").remove();
+        }
+    } else {
+        // Deselect previous region if any
+        if (selectedRegion) {
+            mapSvg.select(`path.region-shape[data-region-id="${selectedRegion}"]`)
+                .attr("fill", "transparent")
+                .attr("stroke-width", 3);
+        }
+        
+        // Select new region
+        selectedRegion = regionId;
+        d3.select(element)
+            .attr("fill", `${regionColor}33`)
+            .attr("stroke-width", 4);
+        
+        // Enable interactions only for countries in this region
+        mapSvg.selectAll("path.country-shape")
+            .style("pointer-events", function(d) {
+                const country = mapCountryDataCache.find(c => c.country_name === d.properties.name);
+                return country && country.region_id === +regionId ? "all" : "none";
+            });
+            
+        // Clear selected country if any when changing regions
+        if (selectedCountry) {
+            selectedCountry = null;
+            mapSvg.selectAll("path.country-shape")
+                .classed("selected-country", false)
+                .attr("fill", "#f0e6d2");
+            mapSvg.select("g#flow-lines").selectAll("*").remove();
+        }
+    }
 }
 
 function handleCountryHover(event, d_feature) {
@@ -180,20 +217,28 @@ function handleCountryMouseOut(event, d_feature) {
 function handleCountryClick(event, d_feature) {
     const element = d3.select(this);
     
-    // Select country
-    mapSvg.selectAll("path.country-shape")
-        .classed("selected-country", false)
-        .attr("fill", "#f0e6d2");
-    
-    element.classed("selected-country", true)
-        .attr("fill", "#ffb700");
-    
-    selectedCountry = d_feature;
-    
-    if (typeof handleCountrySelection === "function") {
-        handleCountrySelection(d_feature);
+    if (element.classed("selected-country")) {
+        // Deselect country
+        element.classed("selected-country", false)
+            .attr("fill", "#f0e6d2");
+        selectedCountry = null;
+        mapSvg.select("g#flow-lines").selectAll("*").remove();
+    } else {
+        // Select country
+        mapSvg.selectAll("path.country-shape")
+            .classed("selected-country", false)
+            .attr("fill", "#f0e6d2");
+        
+        element.classed("selected-country", true)
+            .attr("fill", "#ffb700");
+        
+        selectedCountry = d_feature;
+        
+        if (typeof handleCountrySelection === "function") {
+            handleCountrySelection(d_feature);
+        }
+        drawFlowsForSelectedCountry(d_feature);
     }
-    drawFlowsForSelectedCountry(d_feature);
 }
 
 function setupArrowMarkers(svg) {
