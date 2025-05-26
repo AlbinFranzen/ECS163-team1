@@ -2,6 +2,8 @@
 
 let mapSvg, mapProjection, mapPathGenerator, mapTooltip;
 let mapGeoDataCache, mapCountryDataCache, mapFlowDataCache;
+let selectedRegion = null; // Track currently selected region
+let selectedCountry = null; // Track currently selected country
 
 function initMap(countryFlows, countries, geoData) {
     mapFlowDataCache = countryFlows;
@@ -26,92 +28,161 @@ function initMap(countryFlows, countries, geoData) {
     mapSvg = container.append("svg")
         .attr("width", width)
         .attr("height", height)
-        .attr("viewBox", `0 0 ${width} ${height}`) // For responsiveness
+        .attr("viewBox", `0 0 ${width} ${height}`)
         .attr("preserveAspectRatio", "xMidYMid slice")
-        .style("background-color", "#aed9e0"); // Slightly different blue for ocean
+        .style("background-color", "#aed9e0");
 
-    // --- Improved Map Projection ---
-    mapProjection = d3.geoNaturalEarth1() // A good compromise projection
-        .scale(1) // Start with scale 1, fitExtent will adjust it
-        .translate([0, 0]); // Start with translate 0,0
+    mapProjection = d3.geoNaturalEarth1()
+        .scale(1)
+        .translate([0, 0]);
 
-    // Calculate scale and translate to fit the features within the SVG,
-    // centering the landmasses a bit better.
     const tempPath = d3.geoPath().projection(mapProjection);
-    const bounds = tempPath.bounds(geoData); // Get bounds of all features with initial projection
+    const bounds = tempPath.bounds(geoData);
     const dx = bounds[1][0] - bounds[0][0];
     const dy = bounds[1][1] - bounds[0][1];
     const x = (bounds[0][0] + bounds[1][0]) / 2;
     const y = (bounds[0][1] + bounds[1][1]) / 2;
-    const scale = 0.9 * Math.min(width / dx, height / dy); // 0.9 to add a little padding
+    const scale = 0.9 * Math.min(width / dx, height / dy);
     const translate = [width / 2 - scale * x, height / 2 - scale * y];
 
     mapProjection.scale(scale).translate(translate);
-
-    // If you specifically want to clip Antarctica (though world-110m.json from world-atlas
-    // often doesn't include it as a distinct 'country' feature in the same way)
-    // mapProjection.clipAngle(90); // Clips the sphere to a hemisphere, effectively removing Antarctica
-
     mapPathGenerator = d3.geoPath().projection(mapProjection);
 
-    // Optional: Add a graticule (latitude/longitude lines) for context
-    const graticule = d3.geoGraticule10(); // Every 10 degrees
+    // Add graticule
+    const graticule = d3.geoGraticule10();
     mapSvg.append("path")
         .datum(graticule)
         .attr("class", "graticule")
         .attr("d", mapPathGenerator)
         .style("fill", "none")
-        .style("stroke", "#c0d9e0") // Lighter lines
+        .style("stroke", "#c0d9e0")
         .style("stroke-width", 0.5);
 
+    // Group for regions
+    const regionsGroup = mapSvg.append("g")
+        .attr("class", "regions");
 
-    // --- Draw Countries ---
+    // Group for countries
     const countriesGroup = mapSvg.append("g")
         .attr("class", "countries");
 
+    // Draw countries with initial neutral state
     countriesGroup.selectAll("path.country-shape")
         .data(geoData.features, d => d.id)
         .join("path")
         .attr("d", mapPathGenerator)
-        .attr("fill", "#f0e6d2") // A land-like color (beige/light brown)
-        .attr("stroke", "#786a59") // Darker brown for borders
+        .attr("fill", "#f0e6d2")
+        .attr("stroke", "#786a59")
         .attr("stroke-width", 0.5)
         .attr("class", "country-shape")
-        .on("mouseover", function(event, d_feature) {
-            if (!d3.select(this).classed("selected-country")) {
-                d3.select(this).attr("fill", "#ffd700"); // Brighter gold for hover
-            }
-            mapTooltip.transition().duration(200).style("opacity", .9);
-            mapTooltip.html(d_feature.properties.name || "N/A")
-                   .style("left", (event.pageX + 15) + "px")
-                   .style("top", (event.pageY - 28) + "px");
-        })
-        .on("mouseout", function(event, d_feature) {
-            if (!d3.select(this).classed("selected-country")) {
-                d3.select(this).attr("fill", "#f0e6d2"); // Revert to default land color
-            }
-            mapTooltip.transition().duration(500).style("opacity", 0);
-        })
-        .on("click", function(event, d_feature) {
-            mapSvg.selectAll("path.country-shape")
-                .classed("selected-country", false)
-                .attr("fill", "#f0e6d2"); // Reset all to default land color
-            mapSvg.select("g#flow-lines").selectAll("*").remove();
+        .style("pointer-events", "none")
+        .on("mouseover", handleCountryHover)
+        .on("mouseout", handleCountryMouseOut)
+        .on("click", handleCountryClick);
 
-            d3.select(this).classed("selected-country", true).attr("fill", "#ffb700"); // Slightly darker gold for selected
+    // Create regions by grouping countries
+    const regionGroups = {};
+    mapCountryDataCache.forEach(country => {
+        if (!regionGroups[country.region_id]) {
+            regionGroups[country.region_id] = [];
+        }
+        const geoFeature = geoData.features.find(f => f.properties.name === country.country_name);
+        if (geoFeature) {
+            regionGroups[country.region_id].push(geoFeature);
+        }
+    });
 
-            console.log("Map clicked feature:", d_feature);
+    // Draw region overlays
+    Object.entries(regionGroups).forEach(([regionId, features]) => {
+        const regionFeature = {
+            type: "FeatureCollection",
+            features: features
+        };
 
-            if (typeof handleCountrySelection === "function") {
-                handleCountrySelection(d_feature);
-            }
-            drawFlowsForSelectedCountry(d_feature);
-        });
+        regionsGroup.append("path")
+            .datum(regionFeature)
+            .attr("class", "region-shape")
+            .attr("data-region-id", regionId)
+            .attr("d", mapPathGenerator)
+            .attr("fill", "transparent")
+            .attr("stroke", "#000")
+            .attr("stroke-width", 2)
+            .style("pointer-events", "all")
+            .on("mouseover", function() {
+                d3.select(this).attr("fill", "rgba(0, 0, 0, 0.1)");
+            })
+            .on("mouseout", function() {
+                if (selectedRegion !== regionId) {
+                    d3.select(this).attr("fill", "transparent");
+                }
+            })
+            .on("click", function() {
+                handleRegionClick(regionId, this);
+            });
+    });
 
     mapSvg.append("g").attr("id", "flow-lines");
+    setupArrowMarkers(mapSvg);
+}
 
-    const defs = mapSvg.select("defs").node() ? mapSvg.select("defs") : mapSvg.append("defs"); // Ensure defs exists
-    defs.selectAll("marker").remove(); // Clear old markers before adding new ones
+function handleRegionClick(regionId, element) {
+    // Select new region
+    selectedRegion = regionId;
+    
+    // Update region visual
+    d3.select(element)
+        .attr("fill", "rgba(0, 0, 0, 0.1)");
+    
+    // Enable interactions only for countries in this region
+    mapSvg.selectAll("path.country-shape")
+        .style("pointer-events", function(d) {
+            const country = mapCountryDataCache.find(c => c.country_name === d.properties.name);
+            return country && country.region_id === +regionId ? "all" : "none";
+        });
+}
+
+function handleCountryHover(event, d_feature) {
+    const element = d3.select(this);
+    if (!element.classed("selected-country")) {
+        element.attr("fill", "#ffd700");
+    }
+    
+    mapTooltip.transition().duration(200).style("opacity", .9);
+    mapTooltip.html(d_feature.properties.name || "N/A")
+        .style("left", (event.pageX + 15) + "px")
+        .style("top", (event.pageY - 28) + "px");
+}
+
+function handleCountryMouseOut(event, d_feature) {
+    const element = d3.select(this);
+    if (!element.classed("selected-country")) {
+        element.attr("fill", "#f0e6d2");
+    }
+    mapTooltip.transition().duration(500).style("opacity", 0);
+}
+
+function handleCountryClick(event, d_feature) {
+    const element = d3.select(this);
+    
+    // Select country
+    mapSvg.selectAll("path.country-shape")
+        .classed("selected-country", false)
+        .attr("fill", "#f0e6d2");
+    
+    element.classed("selected-country", true)
+        .attr("fill", "#ffb700");
+    
+    selectedCountry = d_feature;
+    
+    if (typeof handleCountrySelection === "function") {
+        handleCountrySelection(d_feature);
+    }
+    drawFlowsForSelectedCountry(d_feature);
+}
+
+function setupArrowMarkers(svg) {
+    const defs = svg.select("defs").node() ? svg.select("defs") : svg.append("defs");
+    defs.selectAll("marker").remove();
 
     defs.append("marker")
         .attr("id", "arrowhead-out")
@@ -136,10 +207,7 @@ function initMap(countryFlows, countries, geoData) {
         .append("path")
         .attr("d", "M0,-5L10,0L0,5")
         .attr("fill", "rgba(0,100,0,0.7)");
-
-    console.log("Map initialized and drawn with NaturalEarth1 projection.");
 }
-
 
 function drawFlowsForSelectedCountry(selectedMapFeature) {
     const flowLinesGroup = mapSvg.select("g#flow-lines");
