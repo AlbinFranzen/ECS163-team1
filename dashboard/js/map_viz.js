@@ -84,7 +84,7 @@ function initMap(countryFlows, countries, geoData) {
         .attr("stroke", "#786a59")
         .attr("stroke-width", 0.5)
         .attr("class", "country-shape")
-        .style("pointer-events", "none")
+        .style("pointer-events", "none") // Initially disable all country interactions
         .on("mouseover", handleCountryHover)
         .on("mouseout", handleCountryMouseOut)
         .on("click", handleCountryClick);
@@ -150,16 +150,17 @@ function handleRegionClick(regionId, element, regionColor) {
             .attr("fill", "transparent")
             .attr("stroke-width", 3);
         
-        // Reset country interactions
+        // Reset all country interactions and appearance
         mapSvg.selectAll("path.country-shape")
-            .style("pointer-events", "none");
+            .style("pointer-events", "none")
+            .attr("fill", "#f0e6d2")
+            .attr("stroke-width", 0.5);
         
         // Clear selected country if any
         if (selectedCountry) {
             selectedCountry = null;
             mapSvg.selectAll("path.country-shape")
-                .classed("selected-country", false)
-                .attr("fill", "#f0e6d2");
+                .classed("selected-country", false);
             mapSvg.select("g#flow-lines").selectAll("*").remove();
         }
     } else {
@@ -168,6 +169,11 @@ function handleRegionClick(regionId, element, regionColor) {
             mapSvg.select(`path.region-shape[data-region-id="${selectedRegion}"]`)
                 .attr("fill", "transparent")
                 .attr("stroke-width", 3);
+            
+            // Reset all countries first
+            mapSvg.selectAll("path.country-shape")
+                .attr("fill", "#f0e6d2")
+                .attr("stroke-width", 0.5);
         }
         
         // Select new region
@@ -176,28 +182,45 @@ function handleRegionClick(regionId, element, regionColor) {
             .attr("fill", `${regionColor}33`)
             .attr("stroke-width", 4);
         
-        // Enable interactions only for countries in this region
+        // Update country interactions and appearance
         mapSvg.selectAll("path.country-shape")
             .style("pointer-events", function(d) {
                 const country = mapCountryDataCache.find(c => c.country_name === d.properties.name);
                 return country && country.region_id === +regionId ? "all" : "none";
+            })
+            .attr("fill", function(d) {
+                const country = mapCountryDataCache.find(c => c.country_name === d.properties.name);
+                if (country && country.region_id === +regionId) {
+                    return `${regionColor}22`; // Lighter version of region color
+                }
+                return "#f0e6d2";
+            })
+            .attr("stroke-width", function(d) {
+                const country = mapCountryDataCache.find(c => c.country_name === d.properties.name);
+                return country && country.region_id === +regionId ? 1 : 0.5;
             });
             
         // Clear selected country if any when changing regions
         if (selectedCountry) {
             selectedCountry = null;
             mapSvg.selectAll("path.country-shape")
-                .classed("selected-country", false)
-                .attr("fill", "#f0e6d2");
+                .classed("selected-country", false);
             mapSvg.select("g#flow-lines").selectAll("*").remove();
         }
     }
 }
 
 function handleCountryHover(event, d_feature) {
+    // Only show hover effects if the country is in the selected region
+    const country = mapCountryDataCache.find(c => c.country_name === d_feature.properties.name);
+    if (!selectedRegion || !country || country.region_id !== +selectedRegion) {
+        return;
+    }
+
     const element = d3.select(this);
     if (!element.classed("selected-country")) {
-        element.attr("fill", "#ffd700");
+        const regionColor = regionColorScale(country.region_id);
+        element.attr("fill", `${regionColor}66`); // 40% opacity version of region color
     }
     
     mapTooltip.transition().duration(200).style("opacity", .9);
@@ -207,27 +230,44 @@ function handleCountryHover(event, d_feature) {
 }
 
 function handleCountryMouseOut(event, d_feature) {
+    const country = mapCountryDataCache.find(c => c.country_name === d_feature.properties.name);
+    if (!selectedRegion || !country || country.region_id !== +selectedRegion) {
+        return;
+    }
+
     const element = d3.select(this);
     if (!element.classed("selected-country")) {
-        element.attr("fill", "#f0e6d2");
+        const regionColor = regionColorScale(country.region_id);
+        element.attr("fill", `${regionColor}22`); // Return to lighter region color
     }
     mapTooltip.transition().duration(500).style("opacity", 0);
 }
 
 function handleCountryClick(event, d_feature) {
+    // Only handle clicks for countries in the selected region
+    const country = mapCountryDataCache.find(c => c.country_name === d_feature.properties.name);
+    if (!selectedRegion || !country || country.region_id !== +selectedRegion) {
+        return;
+    }
+
     const element = d3.select(this);
     
     if (element.classed("selected-country")) {
         // Deselect country
-        element.classed("selected-country", false)
-            .attr("fill", "#f0e6d2");
+        element.classed("selected-country", false);
+        const regionColor = regionColorScale(country.region_id);
+        element.attr("fill", `${regionColor}22`); // Return to region highlight color
         selectedCountry = null;
         mapSvg.select("g#flow-lines").selectAll("*").remove();
     } else {
         // Select country
+        const regionColor = regionColorScale(country.region_id);
         mapSvg.selectAll("path.country-shape")
             .classed("selected-country", false)
-            .attr("fill", "#f0e6d2");
+            .attr("fill", function(d) {
+                const c = mapCountryDataCache.find(c => c.country_name === d.properties.name);
+                return c && c.region_id === +selectedRegion ? `${regionColor}22` : "#f0e6d2";
+            });
         
         element.classed("selected-country", true)
             .attr("fill", "#ffb700");
