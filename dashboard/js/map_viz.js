@@ -5,6 +5,9 @@ let mapGeoDataCache, mapCountryDataCache, mapFlowDataCache;
 let selectedRegion = null; // Track currently selected region
 let selectedCountry = null; // Track currently selected country
 
+// Add color scale to match chord diagram
+const regionColorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
 function initMap(countryFlows, countries, geoData) {
     mapFlowDataCache = countryFlows;
     mapCountryDataCache = countries;
@@ -58,6 +61,12 @@ function initMap(countryFlows, countries, geoData) {
         .style("stroke", "#c0d9e0")
         .style("stroke-width", 0.5);
 
+    // Get unique region IDs and sort them
+    const uniqueRegionIds = [...new Set(mapCountryDataCache.map(c => c.region_id))].sort((a, b) => a - b);
+    
+    // Set up color scale domain
+    regionColorScale.domain(uniqueRegionIds);
+
     // Group for regions
     const regionsGroup = mapSvg.append("g")
         .attr("class", "regions");
@@ -99,25 +108,31 @@ function initMap(countryFlows, countries, geoData) {
             features: features
         };
 
+        const regionColor = regionColorScale(+regionId);
+
         regionsGroup.append("path")
             .datum(regionFeature)
             .attr("class", "region-shape")
             .attr("data-region-id", regionId)
             .attr("d", mapPathGenerator)
             .attr("fill", "transparent")
-            .attr("stroke", "#000")
-            .attr("stroke-width", 2)
+            .attr("stroke", regionColor)
+            .attr("stroke-width", 3)
             .style("pointer-events", "all")
             .on("mouseover", function() {
-                d3.select(this).attr("fill", "rgba(0, 0, 0, 0.1)");
+                d3.select(this)
+                    .attr("fill", `${regionColor}33`) // Add 33 for 20% opacity
+                    .attr("stroke-width", 4);
             })
             .on("mouseout", function() {
                 if (selectedRegion !== regionId) {
-                    d3.select(this).attr("fill", "transparent");
+                    d3.select(this)
+                        .attr("fill", "transparent")
+                        .attr("stroke-width", 3);
                 }
             })
             .on("click", function() {
-                handleRegionClick(regionId, this);
+                handleRegionClick(regionId, this, regionColor);
             });
     });
 
@@ -125,13 +140,14 @@ function initMap(countryFlows, countries, geoData) {
     setupArrowMarkers(mapSvg);
 }
 
-function handleRegionClick(regionId, element) {
+function handleRegionClick(regionId, element, regionColor) {
     // Select new region
     selectedRegion = regionId;
     
     // Update region visual
     d3.select(element)
-        .attr("fill", "rgba(0, 0, 0, 0.1)");
+        .attr("fill", `${regionColor}33`) // Add 33 for 20% opacity
+        .attr("stroke-width", 4);
     
     // Enable interactions only for countries in this region
     mapSvg.selectAll("path.country-shape")
