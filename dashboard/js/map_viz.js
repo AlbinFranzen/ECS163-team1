@@ -8,12 +8,36 @@ let selectedCountry = null; // Track currently selected country
 // Add color scale to match chord diagram
 const regionColorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
+// Country name mapping for variations
+const countryNameMapping = {
+    "United States of America": "United States",
+    // Add more mappings as needed
+};
+
+function getCountryData(geoFeature) {
+    if (!geoFeature || !geoFeature.properties || !geoFeature.properties.name) return null;
+    
+    // Try direct match first
+    let country = mapCountryDataCache.find(c => c.country_name === geoFeature.properties.name);
+    
+    // If no match, try mapped name
+    if (!country && countryNameMapping[geoFeature.properties.name]) {
+        country = mapCountryDataCache.find(c => c.country_name === countryNameMapping[geoFeature.properties.name]);
+    }
+    
+    return country;
+}
+
 function initMap(countryFlows, countries, geoData) {
     mapFlowDataCache = countryFlows;
     mapCountryDataCache = countries;
     mapGeoDataCache = geoData;
 
-    console.log("Initializing Map. GeoJSON features:", geoData.features.length);
+    // Debug logging to identify unmapped countries
+    const unmappedCountries = geoData.features
+        .filter(f => !getCountryData(f))
+        .map(f => f.properties.name);
+    console.log("Unmapped countries:", unmappedCountries);
 
     const container = d3.select("#map-visualization");
     if (container.empty()) {
@@ -84,7 +108,7 @@ function initMap(countryFlows, countries, geoData) {
         .attr("stroke", "#786a59")
         .attr("stroke-width", 0.5)
         .attr("class", "country-shape")
-        .style("pointer-events", "none") // Initially disable all country interactions
+        .style("pointer-events", "none")
         .on("mouseover", handleCountryHover)
         .on("mouseout", handleCountryMouseOut)
         .on("click", handleCountryClick);
@@ -95,7 +119,11 @@ function initMap(countryFlows, countries, geoData) {
         if (!regionGroups[country.region_id]) {
             regionGroups[country.region_id] = [];
         }
-        const geoFeature = geoData.features.find(f => f.properties.name === country.country_name);
+        // Find matching GeoJSON feature using the mapping function
+        const geoFeature = geoData.features.find(f => {
+            const mappedCountry = getCountryData(f);
+            return mappedCountry && mappedCountry.country_id === country.country_id;
+        });
         if (geoFeature) {
             regionGroups[country.region_id].push(geoFeature);
         }
@@ -185,18 +213,18 @@ function handleRegionClick(regionId, element, regionColor) {
         // Update country interactions and appearance
         mapSvg.selectAll("path.country-shape")
             .style("pointer-events", function(d) {
-                const country = mapCountryDataCache.find(c => c.country_name === d.properties.name);
+                const country = getCountryData(d);
                 return country && country.region_id === +regionId ? "all" : "none";
             })
             .attr("fill", function(d) {
-                const country = mapCountryDataCache.find(c => c.country_name === d.properties.name);
+                const country = getCountryData(d);
                 if (country && country.region_id === +regionId) {
-                    return `${regionColor}22`; // Lighter version of region color
+                    return `${regionColor}22`;
                 }
                 return "#f0e6d2";
             })
             .attr("stroke-width", function(d) {
-                const country = mapCountryDataCache.find(c => c.country_name === d.properties.name);
+                const country = getCountryData(d);
                 return country && country.region_id === +regionId ? 1 : 0.5;
             });
             
@@ -211,8 +239,7 @@ function handleRegionClick(regionId, element, regionColor) {
 }
 
 function handleCountryHover(event, d_feature) {
-    // Only show hover effects if the country is in the selected region
-    const country = mapCountryDataCache.find(c => c.country_name === d_feature.properties.name);
+    const country = getCountryData(d_feature);
     if (!selectedRegion || !country || country.region_id !== +selectedRegion) {
         return;
     }
@@ -220,7 +247,7 @@ function handleCountryHover(event, d_feature) {
     const element = d3.select(this);
     if (!element.classed("selected-country")) {
         const regionColor = regionColorScale(country.region_id);
-        element.attr("fill", `${regionColor}66`); // 40% opacity version of region color
+        element.attr("fill", `${regionColor}66`);
     }
     
     mapTooltip.transition().duration(200).style("opacity", .9);
@@ -230,7 +257,7 @@ function handleCountryHover(event, d_feature) {
 }
 
 function handleCountryMouseOut(event, d_feature) {
-    const country = mapCountryDataCache.find(c => c.country_name === d_feature.properties.name);
+    const country = getCountryData(d_feature);
     if (!selectedRegion || !country || country.region_id !== +selectedRegion) {
         return;
     }
@@ -238,14 +265,13 @@ function handleCountryMouseOut(event, d_feature) {
     const element = d3.select(this);
     if (!element.classed("selected-country")) {
         const regionColor = regionColorScale(country.region_id);
-        element.attr("fill", `${regionColor}22`); // Return to lighter region color
+        element.attr("fill", `${regionColor}22`);
     }
     mapTooltip.transition().duration(500).style("opacity", 0);
 }
 
 function handleCountryClick(event, d_feature) {
-    // Only handle clicks for countries in the selected region
-    const country = mapCountryDataCache.find(c => c.country_name === d_feature.properties.name);
+    const country = getCountryData(d_feature);
     if (!selectedRegion || !country || country.region_id !== +selectedRegion) {
         return;
     }
@@ -256,7 +282,7 @@ function handleCountryClick(event, d_feature) {
         // Deselect country
         element.classed("selected-country", false);
         const regionColor = regionColorScale(country.region_id);
-        element.attr("fill", `${regionColor}22`); // Return to region highlight color
+        element.attr("fill", `${regionColor}22`);
         selectedCountry = null;
         mapSvg.select("g#flow-lines").selectAll("*").remove();
     } else {
@@ -265,7 +291,7 @@ function handleCountryClick(event, d_feature) {
         mapSvg.selectAll("path.country-shape")
             .classed("selected-country", false)
             .attr("fill", function(d) {
-                const c = mapCountryDataCache.find(c => c.country_name === d.properties.name);
+                const c = getCountryData(d);
                 return c && c.region_id === +selectedRegion ? `${regionColor}22` : "#f0e6d2";
             });
         
