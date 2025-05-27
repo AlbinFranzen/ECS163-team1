@@ -360,54 +360,40 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
     const flowLinesGroup = mapSvg.select("g#flow-lines");
     flowLinesGroup.selectAll("*").remove();
 
-    // Ensure mapCountryDataCache and mapFlowDataCache are populated
     if (!mapCountryDataCache || !mapFlowDataCache) {
         console.warn("drawFlows: Country or flow data not available in cache.");
         return;
     }
 
     const mapCountryName = selectedMapFeature.properties.name;
-    const mapCountryNumericIdStr = selectedMapFeature.id;
 
-    const selectedCountryCSV = mapCountryDataCache.find(c => {
-        // Prioritize matching by a more stable ID if possible
-        // This assumes your countries.csv has an 'iso_numeric_str' that matches map's 'id'
-        // or adjust to your actual column name and type.
-        // if (c.iso_numeric_str === mapCountryNumericIdStr) return true;
-        return c.country_name === mapCountryName; // Fallback to name
-    });
+    // Use mapping if available, otherwise use original map name
+    const mappedName = countryNameMapping[mapCountryName] || mapCountryName;
 
-
+    const selectedCountryCSV = mapCountryDataCache.find(c => c.country_name === mappedName);
     if (!selectedCountryCSV) {
-        console.warn(`drawFlows: Could not find CSV details for map country: Name='${mapCountryName}', MapID='${mapCountryNumericIdStr}'`);
+        console.warn(`drawFlows: Could not find CSV country for '${mappedName}' (original: '${mapCountryName}')`);
         return;
     }
+
     const selectedCountryIdForFlows = selectedCountryCSV.country_id;
 
-    // Check if selectedMapFeature has a valid centroid.
-    // For GeoJSON features from TopoJSON, centroid calculation should be reliable.
     let sourceCentroid;
     try {
         sourceCentroid = mapPathGenerator.centroid(selectedMapFeature);
-        if (isNaN(sourceCentroid[0]) || isNaN(sourceCentroid[1])) throw new Error("Centroid calculation resulted in NaN.");
+        if (isNaN(sourceCentroid[0]) || isNaN(sourceCentroid[1])) throw new Error("Centroid NaN.");
     } catch (e) {
         console.error(`Error calculating centroid for ${mapCountryName}:`, e);
-        console.error("Problematic feature:", selectedMapFeature);
-        // Try to find the feature again in the cached geoData if selectedMapFeature is somehow malformed by D3 event
         const freshFeature = mapGeoDataCache.features.find(f => f.id === selectedMapFeature.id);
-        if (freshFeature) {
-            try {
-                sourceCentroid = mapPathGenerator.centroid(freshFeature);
-                 if (isNaN(sourceCentroid[0]) || isNaN(sourceCentroid[1])) throw new Error("Centroid from fresh feature also NaN.");
-            } catch (e2) {
-                console.error("Still couldn't get centroid for fresh feature:", e2);
-                return; // Cannot draw flows without a source centroid
-            }
-        } else {
+        if (!freshFeature) return;
+        try {
+            sourceCentroid = mapPathGenerator.centroid(freshFeature);
+            if (isNaN(sourceCentroid[0]) || isNaN(sourceCentroid[1])) throw new Error("Still NaN.");
+        } catch (e2) {
+            console.error("Centroid recovery failed:", e2);
             return;
         }
     }
-
 
     const relatedFlows = mapFlowDataCache.filter(
         f => f.from_country_id === selectedCountryIdForFlows || f.to_country_id === selectedCountryIdForFlows
@@ -422,41 +408,38 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
             targetCountryCSVId = flow.from_country_id;
             isOutflow = false;
         }
-        flowValue = flow[`flow_${window.currentPeriod}`] || 0;
 
-        if (flowValue <= 0 || targetCountryCSVId === selectedCountryIdForFlows) return; // No flow or self-loop
+        flowValue = flow[`flow_${window.currentPeriod}`] || 0;
+        if (flowValue <= 0 || targetCountryCSVId === selectedCountryIdForFlows) return;
 
         const otherCountryCSV = mapCountryDataCache.find(c => c.country_id === targetCountryCSVId);
-        if (otherCountryCSV) {
-            const otherMapFeature = mapGeoDataCache.features.find(f => {
-                // Match otherMapFeature based on how selectedCountryCSV was matched
-                // if (otherCountryCSV.iso_numeric_str && f.id === otherCountryCSV.iso_numeric_str) return true;
-                return f.properties.name === otherCountryCSV.country_name;
-            });
+        if (!otherCountryCSV) return;
 
-            if (otherMapFeature) {
-                let targetCentroid;
-                try {
-                     targetCentroid = mapPathGenerator.centroid(otherMapFeature);
-                     if (isNaN(targetCentroid[0]) || isNaN(targetCentroid[1])) throw new Error("Target centroid NaN.");
-                } catch (e) {
-                    console.error(`Error calculating target centroid for ${otherCountryCSV.country_name}:`, e);
-                    return; // Skip this flow if target centroid can't be found
-                }
+        const otherMapFeature = mapGeoDataCache.features.find(f => {
+            const geoName = f.properties.name;
+            const mappedGeoName = countryNameMapping[geoName] || geoName;
+            return mappedGeoName === otherCountryCSV.country_name;
+        });
+        if (!otherMapFeature) return;
 
-
-                flowLinesGroup.append("line")
-                    .attr("x1", sourceCentroid[0])
-                    .attr("y1", sourceCentroid[1])
-                    .attr("x2", targetCentroid[0])
-                    .attr("y2", targetCentroid[1])
-                    .attr("stroke", isOutflow ? "rgba(200,0,0,0.6)" : "rgba(0,100,0,0.6)")
-                    .attr("stroke-width", Math.max(0.75, Math.log10(flowValue + 1) / 1.5))
-                    .attr("marker-end", isOutflow ? "url(#arrowhead-out)" : (isOutflow === false ? "url(#arrowhead-in)" : null))
-                    .append("title")
-                    .text(`${isOutflow ? selectedCountryCSV.country_name + ' → ' + otherCountryCSV.country_name : otherCountryCSV.country_name + ' → ' + selectedCountryCSV.country_name}\nTotal Flow (all periods): ${flowValue.toLocaleString()}`);
-            }
+        let targetCentroid;
+        try {
+            targetCentroid = mapPathGenerator.centroid(otherMapFeature);
+            if (isNaN(targetCentroid[0]) || isNaN(targetCentroid[1])) throw new Error("Target centroid NaN.");
+        } catch (e) {
+            console.error(`Error getting centroid for ${otherCountryCSV.country_name}:`, e);
+            return;
         }
+
+        flowLinesGroup.append("line")
+            .attr("x1", sourceCentroid[0])
+            .attr("y1", sourceCentroid[1])
+            .attr("x2", targetCentroid[0])
+            .attr("y2", targetCentroid[1])
+            .attr("stroke", isOutflow ? "rgba(200,0,0,0.6)" : "rgba(0,100,0,0.6)")
+            .attr("stroke-width", Math.max(0.75, Math.log10(flowValue + 1) / 1.5))
+            .attr("marker-end", isOutflow ? "url(#arrowhead-out)" : (isOutflow === false ? "url(#arrowhead-in)" : null))
+            .append("title")
+            .text(`${isOutflow ? selectedCountryCSV.country_name + ' → ' + otherCountryCSV.country_name : otherCountryCSV.country_name + ' → ' + selectedCountryCSV.country_name}\nTotal Flow (all periods): ${flowValue.toLocaleString()}`);
     });
-    // console.log(`Drew flow lines for ${selectedCountryCSV.country_name}.`);
 }
