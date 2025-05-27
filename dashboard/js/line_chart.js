@@ -11,17 +11,29 @@ function initLineChart(countryFlowData, countryData) {
     }
     container.selectAll("*").remove(); // Clear previous chart
 
-    const BBox = container.node().getBoundingClientRect();
-    lineChartWidth = BBox.width;
-    lineChartHeight = BBox.height;
-    lineChartMargin = { top: 20, right: 30, bottom: 60, left: 70 }; // Increased bottom/left for labels
-    lineChartInnerWidth = lineChartWidth - lineChartMargin.left - lineChartMargin.right;
-    lineChartInnerHeight = lineChartHeight - lineChartMargin.top - lineChartMargin.bottom;
+    // Get actual container dimensions and ensure responsive sizing
+    const containerRect = container.node().getBoundingClientRect();
+    lineChartWidth = containerRect.width;
+    lineChartHeight = containerRect.height;
 
-    lineChartSvg = container.append("svg")
+    console.log("Line chart container dimensions:", lineChartWidth, "x", lineChartHeight);
+
+    // Conservative margins that ensure chart fits within container
+    lineChartMargin = {
+        top: 20,     // space for title
+        right: 25,   // space for legend/labels
+        bottom: 40,  // space for x-axis labels
+        left: 50     // space for y-axis labels
+    };
+
+    lineChartInnerWidth = Math.max(lineChartWidth - lineChartMargin.left - lineChartMargin.right, 100);
+    lineChartInnerHeight = Math.max(lineChartHeight - lineChartMargin.top - lineChartMargin.bottom, 60);
+
+    const svg = container.append("svg")
         .attr("width", lineChartWidth)
-        .attr("height", lineChartHeight)
-        .append("g")
+        .attr("height", lineChartHeight);
+
+    lineChartSvg = svg.append("g")
         .attr("transform", `translate(${lineChartMargin.left},${lineChartMargin.top})`);
 
     // Aggregate total global flow for each year as a default view
@@ -88,9 +100,9 @@ function drawLineChartPlot(data, title, lineColor = "steelblue", append = false)
             .text(title.includes("No data") ? title : "No flow data for selection.");
         // Add axes even if no data, for context, if not appending
         if (!append) {
-            const xScale = d3.scaleTime().domain([new Date(1990,0,1), new Date(2005,0,1)]).range([0, lineChartInnerWidth]);
+            const xScale = d3.scaleTime().domain([new Date(1990, 0, 1), new Date(2005, 0, 1)]).range([0, lineChartInnerWidth]);
             const yScale = d3.scaleLinear().domain([0, 1000]).range([lineChartInnerHeight, 0]); // Dummy domain
-             lineChartSvg.append("g").attr("transform", `translate(0,${lineChartInnerHeight})`).call(d3.axisBottom(xScale).ticks(d3.timeYear.every(5)).tickFormat(d3.timeFormat("%Y")));
+            lineChartSvg.append("g").attr("transform", `translate(0,${lineChartInnerHeight})`).call(d3.axisBottom(xScale).ticks(d3.timeYear.every(5)).tickFormat(d3.timeFormat("%Y")));
             lineChartSvg.append("g").call(d3.axisLeft(yScale).ticks(5).tickFormat(d3.format(".2s")));
             addAxisLabelsAndTitle(title);
         }
@@ -126,11 +138,11 @@ function drawLineChartPlot(data, title, lineColor = "steelblue", append = false)
             lineChartYScale.domain([0, newYMax]);
             lineChartSvg.select(".y-axis").transition().duration(300).call(d3.axisLeft(lineChartYScale).ticks(5).tickFormat(d3.format(".2s")));
         }
-         // Update title if appending a new line type
+        // Update title if appending a new line type
         const baseTitle = title.split(" - ")[0];
-    lineChartSvg
-      .select(".chart-title")
-      .text(`${baseTitle} - In/Outflow`);
+        lineChartSvg
+            .select(".chart-title")
+            .text(`${baseTitle} - In/Outflow`);
     }
 
 
@@ -149,23 +161,27 @@ function drawLineChartPlot(data, title, lineColor = "steelblue", append = false)
 
     // Add legend entry if multiple lines
     if (append || title.includes("Inflow") || title.includes("Outflow")) {
-         const legend = lineChartSvg.selectAll(".legend").data([data[0].type], d => d); // Use type for key
+        // Get current number of legend items to position new one correctly
+        const existingLegendCount = lineChartSvg.selectAll(".legend").size();
 
-         legend.enter().append("g")
+        const legend = lineChartSvg.selectAll(".legend").data([data[0].type], d => d); // Use type for key
+
+        legend.enter().append("g")
             .attr("class", "legend")
-            .attr("transform", (d, i) => `translate(0, ${i * 20})`) // Simple legend positioning
-            .each(function(d_type) {
+            .attr("transform", `translate(0, ${existingLegendCount * 20})`) // Position based on existing legend count
+            .each(function (d_type) {
                 const g = d3.select(this);
                 g.append("rect")
                     .attr("x", lineChartInnerWidth - 100) // Adjust position
-                    .attr("width", 18)
-                    .attr("height", 18)
+                    .attr("width", 14) // slightly smaller
+                    .attr("height", 14)
                     .style("fill", lineColor);
                 g.append("text")
-                    .attr("x", lineChartInnerWidth - 78) // Adjust position
-                    .attr("y", 9)
+                    .attr("x", lineChartInnerWidth - 82) // Adjust position
+                    .attr("y", 7)
                     .attr("dy", ".35em")
                     .style("text-anchor", "start")
+                    .style("font-size", "11px") // smaller font for compact legend
                     .text(d_type);
             });
     }
