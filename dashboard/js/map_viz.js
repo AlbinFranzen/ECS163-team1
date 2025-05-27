@@ -10,9 +10,30 @@ const regionColorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
 // Country name mapping for variations
 const countryNameMapping = {
-    "United States of America": "United States",
-    // Add more mappings as needed
+  'W. Sahara': 'Western Sahara',               // ESH
+  'United States of America': 'United States', // USA
+  'Dem. Rep. Congo': 'DR Congo',                // COD
+  'Dominican Rep.': 'Dominican Republic',       // DOM
+  'Falkland Is.': 'Falkland Islands',           // Not in CSV, may need special handling or skip
+  'Greenland': 'Greenland',                      // Not in CSV, may need special handling or skip
+  'Fr. S. Antarctic Lands': 'French Southern Antarctic Lands', // Not in CSV, skip or special
+  "Côte d'Ivoire": 'Ivory Coast',                // CIV
+  'Central African Rep.': 'Central African Republic', // CAF
+  'Eq. Guinea': 'Equatorial Guinea',             // GNQ
+  'eSwatini': 'Swaziland',                        // SWZ (Swaziland renamed eSwatini)
+  'Solomon Is.': 'Solomon Islands',              // SLB
+  'Taiwan': 'Taiwan',                             // Not in CSV, skip or add custom
+  'Czechia': 'Czech Republic',                    // CZE
+  'Antarctica': 'Antarctica',                     // Not in CSV, skip or add custom
+  'N. Cyprus': 'Cyprus',                          // CYP (Northern Cyprus not recognized separately)
+  'Somaliland': 'Somaliland',                     // Not in CSV, skip or add custom
+  'Bosnia and Herz.': 'Bosnia & Herzegovina',    // BIH
+  'Kosovo': 'Kosovo',                             // Not in CSV, skip or add custom
+  'Trinidad and Tobago': 'Trinidad & Tobago',    // TTO
+  'S. Sudan': 'South Sudan'                       // SSD
 };
+
+
 
 function getCountryData(geoFeature) {
     if (!geoFeature || !geoFeature.properties || !geoFeature.properties.name) return null;
@@ -24,7 +45,6 @@ function getCountryData(geoFeature) {
     if (!country && countryNameMapping[geoFeature.properties.name]) {
         country = mapCountryDataCache.find(c => c.country_name === countryNameMapping[geoFeature.properties.name]);
     }
-    
     return country;
 }
 
