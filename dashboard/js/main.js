@@ -28,6 +28,17 @@ const sqlDbPromise = initSqlJs({
     .then(buf => new SQL.Database(new Uint8Array(buf)))
 );
 
+function findUnmatchedCountries(geoData, countries) { // function to find unmatched country names b/t geojson and countries.csv
+    const csvNames = new Set(countries.map(d => d.country_name));
+
+    const unmatched = geoData.features
+        .map(f => f.properties.name)
+        .filter(name => !csvNames.has(name));
+
+    console.warn("Unmatched countries from GeoJSON not found in countries.csv:", unmatched);
+    return unmatched;
+}
+
 // ============================================================================
 // 2) Load CSV/TopoJSON data & initialize the three visualizations
 // ============================================================================
@@ -90,6 +101,7 @@ async function loadDataAndInit() {
     if (typeof initLineChart      === "function") initLineChart(allData.countryFlows, allData.countries);
     if (typeof initChordDiagram  === "function") initChordDiagram(allData.regionFlows, allData.regions);
     if (typeof initMap           === "function") initMap(allData.countryFlows, allData.countries, allData.geoData);
+    findUnmatchedCountries(allData.geoData, allData.countries);
 
   } catch (error) {
     console.error("Error loading data:", error);
@@ -101,6 +113,7 @@ async function loadDataAndInit() {
   }
 }
 
+
 document.addEventListener('DOMContentLoaded', loadDataAndInit);
 
 // ============================================================================
@@ -111,13 +124,13 @@ function handleCountrySelection(clickedMapFeature) {
     console.warn("Data not loaded yet; cannot handle selection.");
     return;
   }
-  const mapCountryName       = clickedMapFeature.properties.name;
   const mapCountryIdNumeric  = +clickedMapFeature.id;
   lastSelectedFeature = clickedMapFeature;
 
-  // Match by name (ensure countries.csv has a country_name column)
+  const mapCountryName = clickedMapFeature.properties.name;
+  const canonicalName = countryNameMapping[mapCountryName] || mapCountryName;
   const selectedCountry = allData.countries.find(
-    c => c.country_name === mapCountryName
+    c => c.country_name === canonicalName
   );
 
   if (!selectedCountry) {
