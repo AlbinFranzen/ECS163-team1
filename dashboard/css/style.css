@@ -18,6 +18,9 @@ body {
     flex-direction: column;
     /* Stack header, dashboard, footer */
 }
+footer a {
+  color: lightblue;
+}
 
 /* Header */
 header {
@@ -103,6 +106,10 @@ header h1 {
     /* allow shrink */
 }
 
+.map-container {
+  position: relative;
+}
+
 /* Chart & Map Panel Styling */
 .chart-container,
 .map-container {
@@ -152,18 +159,16 @@ header h1 {
 }
 
 .explanation-box {
-    position: absolute;
-    top: 60px;
-    /* just below header */
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: 800px;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid #aaa;
-    padding: 10px 20px;
-    font-size: 14px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-    z-index: 100;
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  max-width: 200px;
+  background: rgba(255,255,255,0.8);
+  padding: 8px 12px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  z-index: 10;
+  font-size: 0.8em
 }
 
 .period-buttons {

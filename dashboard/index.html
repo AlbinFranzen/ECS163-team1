@@ -13,7 +13,7 @@
     <header>
         <h1>Global Migration Flows Dashboard</h1>
     </header>
-    <div id="explanation-box" class="explanation-box" style="display:none;"></div>
+    
 
     <div class="dashboard-container">
         <div class="dashboard-main">
@@ -35,11 +35,10 @@
             <main class="main-content">
                 <div class="map-container" id="map-container">
                     <h2>Interactive Migration Map</h2>
-                    <div id="map-visualization">
-                        <!-- D3.js Map will be rendered here -->
-                    </div>
-                    <!-- Tooltip div for the map, initially hidden -->
+                    <div id="map-visualization"><!-- … --></div>
                     <div id="map-tooltip" class="tooltip" style="opacity:0;">Tooltip</div>
+                    <!-- moved explanation box here -->
+                    <div id="explanation-box" class="explanation-box" style="display:none;"></div>
                 </div>
 
                 <div class="dashboard-intro">
@@ -65,7 +64,7 @@
 
     <footer>
         <p>ECS163 Data Visualization Project - Team 1</p>
-        <p><small>Flow data from: Abel & Sander (2014) </small></p>
+        <p><small>Flow data from: Abel & Sander (2014). Explanations data fetched from <a href="https://gmdac.iom.int/national-and-regional-migration-profile-repository">UN migration profiles</a>, contact us for exact profile details.</small></p>
     </footer>
 
     <!-- D3.js Library -->
