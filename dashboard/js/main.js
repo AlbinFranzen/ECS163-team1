@@ -99,8 +99,8 @@ async function loadDataAndInit() {
 
     // Initialize D3 visualizations (if those functions exist)
     if (typeof initLineChart      === "function") initLineChart(allData.countryFlows, allData.countries);
-    if (typeof initChordDiagram  === "function") initChordDiagram(allData.regionFlows, allData.regions);
     if (typeof initMap           === "function") initMap(allData.countryFlows, allData.countries, allData.geoData);
+    if (typeof initChordDiagram  === "function") initChordDiagram(allData.regionFlows, allData.regions);
     findUnmatchedCountries(allData.geoData, allData.countries);
 
   } catch (error) {

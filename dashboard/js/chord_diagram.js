@@ -29,6 +29,14 @@ function initChordDiagram(regionFlowData, regionData) {
     }
     chordContainer.selectAll("*").remove(); // Clear previous chart
 
+    // Select the shared tooltip (should be created by map_viz.js or main.js)
+    const tooltip = d3.select("body").select(".tooltip");
+    if (tooltip.empty()) {
+        console.error("Shared tooltip element not found. Ensure map_viz.js initializes it.");
+        // As a fallback, you could create it here, but it's better if it's shared
+        // tooltip = d3.select("body").append("div").attr("class", "tooltip").style("opacity", 0);
+    }
+
     // Get actual available space
     const containerRect = chordContainer.node().getBoundingClientRect();
     const containerWidth = containerRect.width;
@@ -147,18 +155,25 @@ function initChordDiagram(regionFlowData, regionData) {
         .style("stroke-width", 1)
         .attr("d", d3.arc().innerRadius(innerRadius).outerRadius(radius))
         .style("cursor", "pointer")
-        .on("mouseover", function (event, d) {
-            highlightRegionInChord(chordUniqueRegionIds[d.index], true);
+        .on("mouseover", function (event, d_arc) {
+            highlightRegionInChord(chordUniqueRegionIds[d_arc.index], true);
+            if (!tooltip.empty()) {
+                const regionName = chordNames[d_arc.index];
+                const totalOutflow = d3.sum(matrix[d_arc.index]);
+                const totalInflow = d3.sum(matrix.map(row => row[d_arc.index]));
+                const tooltipText = `${regionName}<br>Outflow: ${totalOutflow.toLocaleString()}<br>Inflow: ${totalInflow.toLocaleString()}`;
+                
+                tooltip.transition().duration(200).style("opacity", .9);
+                tooltip.html(tooltipText)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+            }
         })
-        .on("mouseout", function (event, d) {
+        .on("mouseout", function (event, d_arc) {
             clearChordHighlight();
-        })
-        .append("title")
-        .text(d => {
-            const regionName = chordNames[d.index];
-            const totalOutflow = d3.sum(matrix[d.index]);
-            const totalInflow = d3.sum(matrix.map(row => row[d.index]));
-            return `${regionName}\nOutflow: ${totalOutflow.toLocaleString()}\nInflow: ${totalInflow.toLocaleString()}`;
+            if (!tooltip.empty()) {
+                tooltip.transition().duration(200).style("opacity", 0);
+            }
         });
 
     // --- Add abbreviated upright labels around the circle ---
@@ -193,21 +208,28 @@ function initChordDiagram(regionFlowData, regionData) {
         .style("stroke", d => d3.rgb(color(d.source.index)).darker())
         .style("stroke-width", 0.5)
         .style("cursor", "pointer")
-        .on("mouseover", function (event, d) {
+        .on("mouseover", function (event, d_ribbon) {
             d3.select(this).style("fill-opacity", 0.9);
-            highlightRegionInChord(chordUniqueRegionIds[d.source.index], false);
-            highlightRegionInChord(chordUniqueRegionIds[d.target.index], false);
+            highlightRegionInChord(chordUniqueRegionIds[d_ribbon.source.index], false);
+            highlightRegionInChord(chordUniqueRegionIds[d_ribbon.target.index], false);
+            if (!tooltip.empty()) {
+                const sourceRegion = chordNames[d_ribbon.source.index];
+                const targetRegion = chordNames[d_ribbon.target.index];
+                const flowValue = d_ribbon.source.value;
+                const tooltipText = `${sourceRegion} → ${targetRegion}<br>Flow: ${flowValue.toLocaleString()}`;
+
+                tooltip.transition().duration(200).style("opacity", .9);
+                tooltip.html(tooltipText)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+            }
         })
-        .on("mouseout", function (event, d) {
+        .on("mouseout", function (event, d_ribbon) {
             d3.select(this).style("fill-opacity", 0.6);
             clearChordHighlight();
-        })
-        .append("title")
-        .text(d => {
-            const sourceRegion = chordNames[d.source.index];
-            const targetRegion = chordNames[d.target.index];
-            const flowValue = d.source.value;
-            return `${sourceRegion} → ${targetRegion}\nFlow: ${flowValue.toLocaleString()}`;
+            if (!tooltip.empty()) {
+                tooltip.transition().duration(200).style("opacity", 0);
+            }
         });
 
     // --- Create Compact Legend ---

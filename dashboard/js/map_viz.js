@@ -66,7 +66,12 @@ function initMap(countryFlows, countries, geoData) {
     }
     container.selectAll("*").remove();
 
-    mapTooltip = d3.select("#map-tooltip");
+    if (mapTooltip && typeof mapTooltip.remove === 'function') {
+    mapTooltip.remove(); // Remove any existing tooltip managed by this script
+    }
+    mapTooltip = d3.select("body").append("div")
+        .attr("class", "tooltip")
+        .style("opacity", 0); // Start hidden
 
     const BBox = container.node().getBoundingClientRect();
     const width = BBox.width;
@@ -448,12 +453,9 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
             .attr("stroke-width", d => Math.max(0.75, Math.log10(d.value + 1) / 1.5))
             .attr("marker-end", d => d.isOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
             .style("pointer-events", "all")
-            .style("cursor", "pointer")
             .classed("flow-line", true);
 
-        lineElement.append("title")
-            .text(d => `${d.isOutflow ? d.sourceName + ' → ' + d.targetName : d.targetName + ' → ' + d.sourceName}
-Total Flow: ${d.value.toLocaleString()}`);
+
 
         lineElement
             .on("mouseover", (event, d) => {
@@ -465,8 +467,9 @@ Total Flow: ${d.value.toLocaleString()}`);
                 
                 mapTooltip
                     .transition().duration(200).style("opacity", .9);
+                const tooltipText = `${d.isOutflow ? d.sourceName + ' → ' + d.targetName : d.targetName + ' → ' + d.sourceName}<br>Total Flow: ${d.value.toLocaleString()}`;
                 mapTooltip
-                    .html(currentLine.select("title").text())
+                    .html(tooltipText)
                     .style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY - 10) + "px");
             })
