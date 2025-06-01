@@ -270,7 +270,7 @@ function handleCountryHover(event, d_feature) {
         element.attr("fill", `${regionColor}66`);
     }
     
-    mapTooltip.transition().duration(200).style("opacity", .9);
+    mapTooltip.transition().duration(0).style("opacity", .9);
     mapTooltip.html(d_feature.properties.name || "N/A")
         .style("left", (event.pageX + 15) + "px")
         .style("top", (event.pageY - 28) + "px");
@@ -287,7 +287,7 @@ function handleCountryMouseOut(event, d_feature) {
         const regionColor = regionColorScale(country.region_id);
         element.attr("fill", `${regionColor}22`);
     }
-    mapTooltip.transition().duration(500).style("opacity", 0);
+    mapTooltip.transition().duration(0).style("opacity", 0);
 }
 
 function handleCountryClick(event, d_feature) {
@@ -431,15 +431,54 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
             return;
         }
 
-        flowLinesGroup.append("line")
+        const lineElement = flowLinesGroup.append("line")
+            .datum({ // Attach flow data to the line element
+                sourceName: isOutflow ? selectedCountryCSV.country_name : otherCountryCSV.country_name,
+                targetName: isOutflow ? otherCountryCSV.country_name : selectedCountryCSV.country_name,
+                value: flowValue,
+                period: window.currentPeriod,
+                isOutflow: isOutflow
+            })
             .attr("x1", sourceCentroid[0])
             .attr("y1", sourceCentroid[1])
             .attr("x2", targetCentroid[0])
             .attr("y2", targetCentroid[1])
-            .attr("stroke", isOutflow ? "rgba(200,0,0,0.6)" : "rgba(0,100,0,0.6)")
-            .attr("stroke-width", Math.max(0.75, Math.log10(flowValue + 1) / 1.5))
-            .attr("marker-end", isOutflow ? "url(#arrowhead-out)" : (isOutflow === false ? "url(#arrowhead-in)" : null))
-            .append("title")
-            .text(`${isOutflow ? selectedCountryCSV.country_name + ' → ' + otherCountryCSV.country_name : otherCountryCSV.country_name + ' → ' + selectedCountryCSV.country_name}\nTotal Flow (all periods): ${flowValue.toLocaleString()}`);
+            .attr("stroke", d => d.isOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)") // Use RGB for color
+            .attr("stroke-opacity", 0.6) // Default opacity
+            .attr("stroke-width", d => Math.max(0.75, Math.log10(d.value + 1) / 1.5))
+            .attr("marker-end", d => d.isOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
+            .style("pointer-events", "all")
+            .style("cursor", "pointer")
+            .classed("flow-line", true);
+
+        lineElement.append("title")
+            .text(d => `${d.isOutflow ? d.sourceName + ' → ' + d.targetName : d.targetName + ' → ' + d.sourceName}
+Total Flow: ${d.value.toLocaleString()}`);
+
+        lineElement
+            .on("mouseover", (event, d) => {
+                const currentLine = d3.select(event.currentTarget);
+                // Apply hover style
+                currentLine
+                    .attr("stroke-width", Math.max(1.5, Math.log10(d.value + 1)))
+                    .attr("stroke-opacity", 1);
+                
+                mapTooltip
+                    .transition().duration(200).style("opacity", .9);
+                mapTooltip
+                    .html(currentLine.select("title").text())
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+            })
+            .on("mouseout", (event, d) => {
+                const currentLine = d3.select(event.currentTarget);
+                // Reset style
+                currentLine
+                    .attr("stroke-width", Math.max(0.75, Math.log10(d.value + 1) / 1.5))
+                    .attr("stroke-opacity", 0.6);
+                
+                mapTooltip.transition().duration(200).style("opacity", 0);
+            });
+            // Removed the .on("click", ...) handler entirely
     });
 }
