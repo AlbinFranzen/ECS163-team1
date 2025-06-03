@@ -1,16 +1,30 @@
 /* Basic Reset & Full-Height Flex Layout */
-html, body {
-    height: 100%;
+html,
+body {
+    height: 100vh;
+    /* use viewport height for full screen */
     margin: 0;
     padding: 0;
+    overflow: hidden;
+    /* prevent page scroll, let internal flexbox handle it */
 }
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #eef1f5;
     color: #333;
     line-height: 1.6;
     display: flex;
-    flex-direction: column; /* Stack header, dashboard, footer */
+    flex-direction: column;
+    /* Stack header, dashboard, footer */
+}
+footer a {
+  color: lightblue;
+}
+.flow-line:selected-flow,
+.flow-line.selected-flow {
+  stroke: gold !important;
+  stroke-width: 2.5 !important;
 }
 
 /* Header */
@@ -19,9 +33,10 @@ header {
     color: #ecf0f1;
     padding: 1rem 20px;
     text-align: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     z-index: 10;
 }
+
 header h1 {
     margin: 0;
     font-size: 1.8em;
@@ -32,111 +47,170 @@ header h1 {
 .dashboard-container {
     flex: 1;
     display: flex;
-    padding: 20px;
-    gap: 20px;
+    flex-direction: column;
+    /* Stack intro and main dashboard */
     width: 100%;
     box-sizing: border-box;
     overflow: hidden;
 }
 
-/* Sidebar (left panels) */
+/* New container for intro and charts */
+.dashboard-main {
+    flex: 1;
+    display: flex;
+    padding: 20px;
+    gap: 20px;
+}
+
+/* Sidebar (left panels) - reduced width to eliminate empty space */
 .sidebar {
-    flex: 1;                 /* ~33% width */
+    flex: 1.8;
+    /* ~47% width - reduced to better utilize space */
     display: flex;
     flex-direction: column;
     gap: 20px;
-    min-width: 320px;
-    max-width: 450px;
-}
-.sidebar .chart-container {
-    flex: 1;                 /* split height equally */
-    display: flex;
-    flex-direction: column;
-    min-height: 0;           /* allow shrink */
+    min-width: 350px;
+    max-width: 600px;
+    /* reduced to give more space to map */
 }
 
-/* Main Content / Map Area */
-.main-content {
-    flex: 2.5;               /* ~67% width */
+/* Chord diagram - larger space (60%) */
+#chord-diagram-container {
+    flex: 3;
+    /* 60% of sidebar height - larger for better readability */
     display: flex;
-    min-width: 0;            /* allow shrink */
+    flex-direction: column;
+    min-height: 0;
 }
+
+/* Line chart - smaller space (40%) */
+#line-chart-container {
+    flex: 2;
+    /* 40% of sidebar height - adequate for temporal trends */
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Main Content / Map Area - increased for better map visibility */
+.main-content {
+    flex: 2.2;
+    /* ~53% width - increased to give map more space */
+    display: flex;
+    flex-direction: column;
+    /* Stack map and intro vertically */
+    min-width: 0;
+    gap: 20px;
+}
+
 .map-container {
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0;           /* allow shrink */
+    min-height: 0;
+    /* allow shrink */
+}
+
+.map-container {
+  position: relative;
 }
 
 /* Chart & Map Panel Styling */
 .chart-container,
 .map-container {
     background-color: #fff;
-    padding: 20px;
+    padding: 15px;
+    /* reduced from 20px to give more space to visualizations */
     border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-    overflow: hidden;        /* clip SVGs if needed */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    /* clip SVGs if needed */
 }
+
 .chart-container h2,
 .map-container h2 {
     margin-top: 0;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
+    /* reduced from 15px to save vertical space */
     font-size: 1.1em;
     font-weight: 600;
     color: #34495e;
     text-align: center;
     border-bottom: 1px solid #ecf0f1;
-    padding-bottom: 10px;
+    padding-bottom: 8px;
+    /* reduced from 10px to save vertical space */
 }
 
-/* Dashboard Intro */
+/* Dashboard Intro - now positioned in right area */
 .dashboard-intro {
-    width: 80%;
-    max-width: 900px;
-    margin: 15px auto 20px;
-    padding: 15px 25px;
     background-color: #fff;
+    padding: 15px 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    text-align: center;
-    font-size: 0.95em;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    text-align: left;
+    /* changed from center to left for better right-side layout */
+    font-size: 0.9em;
+    /* slightly smaller to fit in compact space */
     color: #444;
+    max-height: 200px;
+    /* limit height so it doesn't dominate */
+    overflow-y: auto;
+    /* scroll if content is too long */
 }
+
 .dashboard-intro p {
     margin: 0;
     line-height: 1.7;
 }
 
 .explanation-box {
- position: absolute;
- top: 60px;            /* just below header */
- left: 50%;
- transform: translateX(-50%);
- max-width: 800px;
- background: rgba(255,255,255,0.95);
- border: 1px solid #aaa;
- padding: 10px 20px;
- font-size: 14px;
- box-shadow: 0 2px 5px rgba(0,0,0,0.3);
- z-index: 100;
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  max-width: 200px;
+  background: rgba(255,255,255,0.8);
+  padding: 8px 12px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  z-index: 10;
+  font-size: 0.8em
 }
 
-  .period-buttons {
-      text-align: center;
-      margin: 10px 0;
-    }
-    .period-buttons button {
-      margin: 0 5px;
-      padding: 6px 12px;
-      background: #ddd;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .period-buttons button.active,
-    .period-buttons button:hover {
-      background: #bbb;
-    }
+.period-buttons {
+    text-align: center;
+    margin: 10px 0;
+}
+
+.period-buttons button {
+    margin: 0 5px;
+    padding: 6px 12px;
+    background: #ddd;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.period-buttons button.active,
+.period-buttons button:hover {
+    background: #bbb;
+}
+
+/* Tooltip */
+.tooltip {
+    position: absolute;
+    text-align: left;
+    padding: 6px 10px;
+    font-size: 13px;
+    background: rgba(255,255,255, 0.9);
+    color: black;
+    border: 1px solid #555;
+    border-radius: 4px;
+    pointer-events: none;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+    z-index: 20;
+    transition: opacity 0.05s ease-in-out, background-color 0.05s ease-in-out;
+}
 
 /* Footer */
 footer {
@@ -148,25 +222,49 @@ footer {
     width: 100%;
     box-sizing: border-box;
 }
+
 footer p {
     margin: 0 0 5px;
 }
+
 footer p:last-child {
     margin-bottom: 0;
 }
 
-/* D3 Placeholders (line, chord, map) */
-#line-chart,
-#chord-diagram,
+/* D3 Placeholders - maximize container space */
+#chord-diagram {
+    width: 100%;
+    height: 100%;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    /* allow full shrink and expand */
+    display: block;
+    overflow: hidden;
+}
+
+#line-chart {
+    width: 100%;
+    height: 100%;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    /* allow full shrink and expand */
+    display: block;
+    overflow: hidden;
+}
+
 #map-visualization {
     width: 100%;
     height: 100%;
     flex: 1;
-    min-height: 250px;
+    min-height: 400px;
+    /* maps need adequate height for geographic detail */
     display: flex;
     align-items: center;
     justify-content: center;
 }
+
 #line-chart svg,
 #chord-diagram svg,
 #map-visualization svg {
@@ -175,20 +273,7 @@ footer p:last-child {
     display: block;
 }
 
-/* Tooltip */
-.tooltip {
-    position: absolute;
-    text-align: left;
-    padding: 8px 12px;
-    font-size: 12px;
-    background: rgba(44,62,80,0.9);
-    color: #ecf0f1;
-    border-radius: 4px;
-    pointer-events: none;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    white-space: nowrap;
-    z-index: 20;
-}
+
 
 /* Optional: Map country hover feedback */
 .country-shape {
@@ -197,31 +282,55 @@ footer p:last-child {
 
 /* Responsive Adjustments */
 @media (max-width: 900px) {
-    .dashboard-container {
+    .dashboard-main {
         flex-direction: column;
         overflow-y: auto;
     }
-    .sidebar, .main-content {
+
+    .sidebar,
+    .main-content {
         flex: none;
         width: 100%;
         max-width: none;
     }
-    .sidebar .chart-container {
-        min-height: 350px;
+
+    .main-content {
+        flex-direction: row;
+        /* put intro next to map on mobile */
     }
-    .map-container {
+
+    #chord-diagram-container {
         min-height: 400px;
     }
+
+    #line-chart-container {
+        min-height: 320px;
+    }
+
+    .map-container {
+        min-height: 400px;
+        flex: 2;
+        /* give map more space than intro on mobile */
+    }
+
+    .dashboard-intro {
+        flex: 1;
+        max-height: none;
+        /* remove height restriction on mobile */
+    }
 }
+
 @media (max-width: 480px) {
     header h1 {
         font-size: 1.5em;
     }
+
     .chart-container h2,
     .map-container h2 {
         font-size: 1em;
     }
+
     .tooltip {
-        font-size: 11px;
+        font-size: 0.8em;
     }
 }
