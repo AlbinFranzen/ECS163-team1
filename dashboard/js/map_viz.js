@@ -69,7 +69,7 @@ function initMap(countryFlows, countries, geoData) {
     container.selectAll("*").remove();
 
     if (mapTooltip && typeof mapTooltip.remove === 'function') {
-    mapTooltip.remove(); // Remove any existing tooltip managed by this script
+        mapTooltip.remove(); // Remove any existing tooltip managed by this script
     }
     mapTooltip = d3.select("body").append("div")
         .attr("class", "tooltip")
@@ -85,6 +85,14 @@ function initMap(countryFlows, countries, geoData) {
         .attr("viewBox", `0 0 ${width} ${height}`)
         .attr("preserveAspectRatio", "xMidYMid slice")
         .style("background-color", "#aed9e0");
+
+    // Add click handler for ocean (background)
+    mapSvg.on("click", function(event) {
+        // Check if click was on the background (ocean)
+        if (event.target === this) {
+            handleOceanClick();
+        }
+    });
 
     mapProjection = d3.geoNaturalEarth1()
         .scale(1)
@@ -293,6 +301,9 @@ function handleRegionClick(regionId, element, regionColor) {
         
         // Clear flow lines
         mapSvg.select("g#flow-lines").selectAll("*").remove();
+
+        // Show global line chart on deselection
+        showGlobalLineChart();
     } else {
         // Deselect previous region if any
         if (selectedRegion) {
@@ -389,6 +400,9 @@ function handleCountryClick(event, d_feature) {
         element.attr("fill", `${regionColor}22`);
         selectedCountry = null;
         mapSvg.select("g#flow-lines").selectAll("*").remove();
+        
+        // Show region flows when deselecting country
+        drawFlowsForSelectedRegion(selectedRegion);
     } else {
         // Select country
         const regionColor = regionColorScale(country.region_id);
@@ -563,4 +577,30 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
             });
             // Removed the .on("click", ...) handler entirely
     });
+}
+
+function handleOceanClick() {
+    // Deselect any selected region
+    if (selectedRegion) {
+        const regionElement = mapSvg.select(`path.region-shape[data-region-id="${selectedRegion}"]`);
+        handleRegionClick(selectedRegion, regionElement.node(), regionColorScale(selectedRegion));
+    }
+    
+    // Deselect any selected country
+    if (selectedCountry) {
+        selectedCountry = null;
+        mapSvg.selectAll("path.country-shape")
+            .classed("selected-country", false)
+            .attr("fill", "#f0e6d2");
+        mapSvg.select("g#flow-lines").selectAll("*").remove();
+    }
+
+    // Show global line chart
+    showGlobalLineChart();
+}
+
+function showGlobalLineChart() {
+    if (typeof initLineChart === "function") {
+        initLineChart(mapFlowDataCache, mapCountryDataCache);
+    }
 }
