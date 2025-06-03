@@ -401,8 +401,8 @@ function handleCountryClick(event, d_feature) {
         selectedCountry = null;
         mapSvg.select("g#flow-lines").selectAll("*").remove();
         
-        // Show region flows when deselecting country
-        drawFlowsForSelectedRegion(selectedRegion);
+        // Show global line chart when deselecting country
+        showGlobalLineChart();
     } else {
         // Select country
         const regionColor = regionColorScale(country.region_id);
