@@ -1,7 +1,7 @@
 // dashboard/js/map_viz.js
 
 let mapSvg, mapProjection, mapPathGenerator, mapTooltip;
-let mapGeoDataCache, mapCountryDataCache, mapFlowDataCache;
+let mapGeoDataCache, mapCountryDataCache, mapFlowDataCache, mapRegionFlowDataCache;
 let selectedRegion = null; // Track currently selected region
 let selectedCountry = null; // Track currently selected country
 
@@ -32,6 +32,8 @@ function initMap(countryFlows, countries, geoData) {
     mapFlowDataCache = countryFlows;
     mapCountryDataCache = countries;
     mapGeoDataCache = geoData;
+    // Get region flows from allData (global variable)
+    mapRegionFlowDataCache = allData.regionFlows;
 
     // Debug logging to identify unmapped countries
     const unmappedCountries = geoData.features
@@ -170,6 +172,79 @@ function initMap(countryFlows, countries, geoData) {
     setupArrowMarkers(mapSvg);
 }
 
+function drawFlowsForSelectedRegion(regionId) {
+    const flowLinesGroup = mapSvg.select("g#flow-lines");
+    flowLinesGroup.selectAll("*").remove();
+
+    // Get region flows for the selected region from region flows data
+    const relatedFlows = mapRegionFlowDataCache.filter(
+        f => f.from_region_id === +regionId || f.to_region_id === +regionId
+    );
+
+    // Get region centroids by aggregating country centroids
+    const regionCentroids = {};
+    mapCountryDataCache.forEach(country => {
+        const countryFeature = mapGeoDataCache.features.find(f => {
+            return f.properties.name === country.country_name;
+        });
+        
+        if (countryFeature) {
+            const centroid = mapPathGenerator.centroid(countryFeature);
+            if (!isNaN(centroid[0]) && !isNaN(centroid[1])) {
+                if (!regionCentroids[country.region_id]) {
+                    regionCentroids[country.region_id] = {
+                        sumX: 0,
+                        sumY: 0,
+                        count: 0
+                    };
+                }
+                regionCentroids[country.region_id].sumX += centroid[0];
+                regionCentroids[country.region_id].sumY += centroid[1];
+                regionCentroids[country.region_id].count++;
+            }
+        }
+    });
+
+    // Calculate average centroids for each region
+    Object.keys(regionCentroids).forEach(rid => {
+        const region = regionCentroids[rid];
+        region.x = region.sumX / region.count;
+        region.y = region.sumY / region.count;
+    });
+
+    // Get region names for tooltips
+    const regionNames = {};
+    allData.regions.forEach(r => {
+        regionNames[r.region_id] = r.region_name;
+    });
+
+    // Draw flows
+    relatedFlows.forEach(flow => {
+        const flowValue = flow[`flow_${window.currentPeriod}`] || 0;
+        if (flowValue <= 0 || flow.from_region_id === flow.to_region_id) return; // Skip if no flow or self-loop
+
+        const sourceRegion = regionCentroids[flow.from_region_id];
+        const targetRegion = regionCentroids[flow.to_region_id];
+
+        if (sourceRegion && targetRegion) {
+            const isOutflow = flow.from_region_id === +regionId;
+            const fromRegionName = regionNames[flow.from_region_id] || `Region ${flow.from_region_id}`;
+            const toRegionName = regionNames[flow.to_region_id] || `Region ${flow.to_region_id}`;
+            
+            flowLinesGroup.append("line")
+                .attr("x1", sourceRegion.x)
+                .attr("y1", sourceRegion.y)
+                .attr("x2", targetRegion.x)
+                .attr("y2", targetRegion.y)
+                .attr("stroke", isOutflow ? "rgba(200,0,0,0.6)" : "rgba(0,100,0,0.6)")
+                .attr("stroke-width", Math.max(1.5, Math.log10(flowValue + 1) / 1.5))
+                .attr("marker-end", isOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
+                .append("title")
+                .text(`${fromRegionName} → ${toRegionName}\nTotal Flow: ${flowValue.toLocaleString()}`);
+        }
+    });
+}
+
 function handleRegionClick(regionId, element, regionColor) {
     if (selectedRegion === regionId) {
         // Deselect region
@@ -189,8 +264,10 @@ function handleRegionClick(regionId, element, regionColor) {
             selectedCountry = null;
             mapSvg.selectAll("path.country-shape")
                 .classed("selected-country", false);
-            mapSvg.select("g#flow-lines").selectAll("*").remove();
         }
+        
+        // Clear flow lines
+        mapSvg.select("g#flow-lines").selectAll("*").remove();
     } else {
         // Deselect previous region if any
         if (selectedRegion) {
@@ -233,8 +310,10 @@ function handleRegionClick(regionId, element, regionColor) {
             selectedCountry = null;
             mapSvg.selectAll("path.country-shape")
                 .classed("selected-country", false);
-            mapSvg.select("g#flow-lines").selectAll("*").remove();
         }
+        
+        // Draw flows for the selected region
+        drawFlowsForSelectedRegion(regionId);
     }
 }
 
