@@ -254,26 +254,60 @@ function drawFlowsForSelectedRegion(regionId) {
     // Draw flows
     relatedFlows.forEach(flow => {
         const flowValue = flow[`flow_${window.currentPeriod}`] || 0;
-        if (flowValue <= 0 || flow.from_region_id === flow.to_region_id) return; // Skip if no flow or self-loop
+        if (flowValue <= 0 || flow.from_region_id === flow.to_region_id) return;
 
         const sourceRegion = regionCentroids[flow.from_region_id];
         const targetRegion = regionCentroids[flow.to_region_id];
 
         if (sourceRegion && targetRegion) {
             const isOutflow = flow.from_region_id === +regionId;
+            
+            // Skip if it's an inflow with zero value
+            if (!isOutflow && flowValue <= 0) return;
+
             const fromRegionName = regionNames[flow.from_region_id] || `Region ${flow.from_region_id}`;
             const toRegionName = regionNames[flow.to_region_id] || `Region ${flow.to_region_id}`;
             
-            flowLinesGroup.append("line")
-                .attr("x1", sourceRegion.x)
-                .attr("y1", sourceRegion.y)
-                .attr("x2", targetRegion.x)
-                .attr("y2", targetRegion.y)
-                .attr("stroke", isOutflow ? "rgba(200,0,0,0.6)" : "rgba(0,100,0,0.6)")
-                .attr("stroke-width", Math.max(1.5, Math.log10(flowValue + 1) / 1.5))
-                .attr("marker-end", isOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
-                .append("title")
-                .text(`${fromRegionName} → ${toRegionName}\nTotal Flow: ${flowValue.toLocaleString()}`);
+            const pathData = {
+                sourceName: fromRegionName,
+                targetName: toRegionName,
+                value: flowValue,
+                period: window.currentPeriod,
+                isOutflow: isOutflow
+            };
+
+            flowLinesGroup.append("path")
+                .datum(pathData)
+                .attr("d", () => createCurvedPath(sourceRegion, targetRegion, isOutflow))
+                .attr("fill", "none")
+                .attr("stroke", d => d.isOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)")
+                .attr("stroke-opacity", 0.6)
+                .attr("stroke-width", d => Math.max(0.75, Math.log10(d.value + 1) / 1.5))
+                .attr("marker-end", d => d.isOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
+                .style("pointer-events", "all")
+                .classed("flow-line", true)
+                .on("mouseover", (event, d) => {
+                    const currentPath = d3.select(event.currentTarget);
+                    currentPath
+                        .attr("stroke-width", Math.max(1.5, Math.log10(d.value + 1)))
+                        .attr("stroke-opacity", 1);
+                    
+                    mapTooltip
+                        .transition().duration(200).style("opacity", .9);
+                    const tooltipText = `${d.sourceName} → ${d.targetName}<br>Total Flow: ${d.value.toLocaleString()}`;
+                    mapTooltip
+                        .html(tooltipText)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", (event, d) => {
+                    const currentPath = d3.select(event.currentTarget);
+                    currentPath
+                        .attr("stroke-width", Math.max(0.75, Math.log10(d.value + 1) / 1.5))
+                        .attr("stroke-opacity", 0.6);
+                    
+                    mapTooltip.transition().duration(200).style("opacity", 0);
+                });
         }
     });
 }
@@ -349,7 +383,7 @@ function handleRegionClick(regionId, element, regionColor) {
         }
         
         // Draw flows for the selected region
-        drawFlowsForSelectedRegion(regionId);
+        drawFlowsForRegion(regionId);
     }
 }
 
@@ -429,29 +463,151 @@ function setupArrowMarkers(svg) {
     const defs = svg.select("defs").node() ? svg.select("defs") : svg.append("defs");
     defs.selectAll("marker").remove();
 
+    // Outflow arrow (red)
     defs.append("marker")
         .attr("id", "arrowhead-out")
         .attr("viewBox", "0 -5 10 10")
         .attr("refX", 8)
         .attr("refY", 0)
-        .attr("markerWidth", 5)
-        .attr("markerHeight", 5)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
         .attr("orient", "auto")
         .append("path")
         .attr("d", "M0,-5L10,0L0,5")
         .attr("fill", "rgba(200,0,0,0.7)");
 
+    // Inflow arrow (green)
     defs.append("marker")
         .attr("id", "arrowhead-in")
         .attr("viewBox", "0 -5 10 10")
         .attr("refX", 8)
         .attr("refY", 0)
-        .attr("markerWidth", 5)
-        .attr("markerHeight", 5)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
         .attr("orient", "auto")
         .append("path")
         .attr("d", "M0,-5L10,0L0,5")
         .attr("fill", "rgba(0,100,0,0.7)");
+}
+
+// Helper function to create curved path
+function createCurvedPath(source, target, isOutflow) {
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const dr = Math.sqrt(dx * dx + dy * dy);
+    
+    // Determine curve direction based on flow type and relative positions
+    const curve = isOutflow ? 1 : -1;
+    const sweep = dx * dy > 0 ? 1 : 0;
+    
+    return `M${source.x},${source.y}A${dr},${dr} 0 0,${sweep * curve} ${target.x},${target.y}`;
+}
+
+function drawFlowsForRegion(regionId) {
+    const flowLinesGroup = mapSvg.select("g#flow-lines");
+    flowLinesGroup.selectAll("*").remove();
+
+    // Get region flows for the selected region from region flows data
+    const relatedFlows = mapRegionFlowDataCache.filter(
+        f => f.from_region_id === +regionId || f.to_region_id === +regionId
+    );
+
+    // Get region centroids by aggregating country centroids
+    const regionCentroids = {};
+    mapCountryDataCache.forEach(country => {
+        const countryFeature = mapGeoDataCache.features.find(f => {
+            return f.properties.name === country.country_name;
+        });
+        
+        if (countryFeature) {
+            const centroid = mapPathGenerator.centroid(countryFeature);
+            if (!isNaN(centroid[0]) && !isNaN(centroid[1])) {
+                if (!regionCentroids[country.region_id]) {
+                    regionCentroids[country.region_id] = {
+                        sumX: 0,
+                        sumY: 0,
+                        count: 0
+                    };
+                }
+                regionCentroids[country.region_id].sumX += centroid[0];
+                regionCentroids[country.region_id].sumY += centroid[1];
+                regionCentroids[country.region_id].count++;
+            }
+        }
+    });
+
+    // Calculate average centroids for each region
+    Object.keys(regionCentroids).forEach(rid => {
+        const region = regionCentroids[rid];
+        region.x = region.sumX / region.count;
+        region.y = region.sumY / region.count;
+    });
+
+    // Get region names for tooltips
+    const regionNames = {};
+    allData.regions.forEach(r => {
+        regionNames[r.region_id] = r.region_name;
+    });
+
+    // Draw flows
+    relatedFlows.forEach(flow => {
+        const flowValue = flow[`flow_${window.currentPeriod}`] || 0;
+        if (flowValue <= 0 || flow.from_region_id === flow.to_region_id) return;
+
+        const sourceRegion = regionCentroids[flow.from_region_id];
+        const targetRegion = regionCentroids[flow.to_region_id];
+
+        if (sourceRegion && targetRegion) {
+            const isOutflow = flow.from_region_id === +regionId;
+            
+            // Skip if it's an inflow with zero value
+            if (!isOutflow && flowValue <= 0) return;
+
+            const fromRegionName = regionNames[flow.from_region_id] || `Region ${flow.from_region_id}`;
+            const toRegionName = regionNames[flow.to_region_id] || `Region ${flow.to_region_id}`;
+            
+            const pathData = {
+                sourceName: fromRegionName,
+                targetName: toRegionName,
+                value: flowValue,
+                period: window.currentPeriod,
+                isOutflow: isOutflow
+            };
+
+            flowLinesGroup.append("path")
+                .datum(pathData)
+                .attr("d", () => createCurvedPath(sourceRegion, targetRegion, isOutflow))
+                .attr("fill", "none")
+                .attr("stroke", d => d.isOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)")
+                .attr("stroke-opacity", 0.6)
+                .attr("stroke-width", d => Math.max(0.75, Math.log10(d.value + 1) / 1.5))
+                .attr("marker-end", d => d.isOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
+                .style("pointer-events", "all")
+                .classed("flow-line", true)
+                .on("mouseover", (event, d) => {
+                    const currentPath = d3.select(event.currentTarget);
+                    currentPath
+                        .attr("stroke-width", Math.max(1.5, Math.log10(d.value + 1)))
+                        .attr("stroke-opacity", 1);
+                    
+                    mapTooltip
+                        .transition().duration(200).style("opacity", .9);
+                    const tooltipText = `${d.sourceName} → ${d.targetName}<br>Total Flow: ${d.value.toLocaleString()}`;
+                    mapTooltip
+                        .html(tooltipText)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", (event, d) => {
+                    const currentPath = d3.select(event.currentTarget);
+                    currentPath
+                        .attr("stroke-width", Math.max(0.75, Math.log10(d.value + 1) / 1.5))
+                        .attr("stroke-opacity", 0.6);
+                    
+                    mapTooltip.transition().duration(200).style("opacity", 0);
+                });
+        }
+    });
 }
 
 function drawFlowsForSelectedCountry(selectedMapFeature) {
@@ -464,11 +620,9 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
     }
 
     const mapCountryName = selectedMapFeature.properties.name;
-
-    // Use mapping if available, otherwise use original map name
     const mappedName = countryNameMapping[mapCountryName] || mapCountryName;
-
     const selectedCountryCSV = mapCountryDataCache.find(c => c.country_name === mappedName);
+
     if (!selectedCountryCSV) {
         console.warn(`drawFlows: Could not find CSV country for '${mappedName}' (original: '${mapCountryName}')`);
         return;
@@ -506,9 +660,10 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
             targetCountryCSVId = flow.from_country_id;
             isOutflow = false;
         }
-
         flowValue = flow[`flow_${window.currentPeriod}`] || 0;
-        if (flowValue <= 0 || targetCountryCSVId === selectedCountryIdForFlows) return;
+        
+        // Skip if no flow or self-loop, or if it's an inflow with zero value
+        if (flowValue <= 0 || targetCountryCSVId === selectedCountryIdForFlows || (!isOutflow && flowValue <= 0)) return;
 
         const otherCountryCSV = mapCountryDataCache.find(c => c.country_id === targetCountryCSVId);
         if (!otherCountryCSV) return;
@@ -529,38 +684,38 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
             return;
         }
 
-        const lineElement = flowLinesGroup.append("line")
-            .datum({ // Attach flow data to the line element
-                sourceName: isOutflow ? selectedCountryCSV.country_name : otherCountryCSV.country_name,
-                targetName: isOutflow ? otherCountryCSV.country_name : selectedCountryCSV.country_name,
-                value: flowValue,
-                period: window.currentPeriod,
-                isOutflow: isOutflow
-            })
-            .attr("x1", sourceCentroid[0])
-            .attr("y1", sourceCentroid[1])
-            .attr("x2", targetCentroid[0])
-            .attr("y2", targetCentroid[1])
-            .attr("stroke", d => d.isOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)") // Use RGB for color
-            .attr("stroke-opacity", 0.6) // Default opacity
+        const source = { x: sourceCentroid[0], y: sourceCentroid[1] };
+        const target = { x: targetCentroid[0], y: targetCentroid[1] };
+
+        const pathData = {
+            sourceName: isOutflow ? selectedCountryCSV.country_name : otherCountryCSV.country_name,
+            targetName: isOutflow ? otherCountryCSV.country_name : selectedCountryCSV.country_name,
+            value: flowValue,
+            period: window.currentPeriod,
+            isOutflow: isOutflow
+        };
+
+        const lineElement = flowLinesGroup.append("path")
+            .datum(pathData)
+            .attr("d", () => createCurvedPath(source, target, isOutflow))
+            .attr("fill", "none")
+            .attr("stroke", d => d.isOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)")
+            .attr("stroke-opacity", 0.6)
             .attr("stroke-width", d => Math.max(0.75, Math.log10(d.value + 1) / 1.5))
             .attr("marker-end", d => d.isOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
             .style("pointer-events", "all")
             .classed("flow-line", true);
 
-
-
         lineElement
             .on("mouseover", (event, d) => {
                 const currentLine = d3.select(event.currentTarget);
-                // Apply hover style
                 currentLine
                     .attr("stroke-width", Math.max(1.5, Math.log10(d.value + 1)))
                     .attr("stroke-opacity", 1);
                 
                 mapTooltip
                     .transition().duration(200).style("opacity", .9);
-                const tooltipText = `${d.isOutflow ? d.sourceName + ' → ' + d.targetName : d.targetName + ' → ' + d.sourceName}<br>Total Flow: ${d.value.toLocaleString()}`;
+                const tooltipText = `${d.sourceName} → ${d.targetName}<br>Total Flow: ${d.value.toLocaleString()}`;
                 mapTooltip
                     .html(tooltipText)
                     .style("left", (event.pageX + 10) + "px")
@@ -568,14 +723,12 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
             })
             .on("mouseout", (event, d) => {
                 const currentLine = d3.select(event.currentTarget);
-                // Reset style
                 currentLine
                     .attr("stroke-width", Math.max(0.75, Math.log10(d.value + 1) / 1.5))
                     .attr("stroke-opacity", 0.6);
                 
                 mapTooltip.transition().duration(200).style("opacity", 0);
             });
-            // Removed the .on("click", ...) handler entirely
     });
 }
 
