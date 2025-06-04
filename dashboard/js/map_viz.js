@@ -5,8 +5,12 @@ let mapGeoDataCache, mapCountryDataCache, mapFlowDataCache, mapRegionFlowDataCac
 let selectedRegion = null; // Track currently selected region
 let selectedCountry = null; // Track currently selected country
 
+
 // Add color scale to match chord diagram
-const regionColorScale = d3.scaleOrdinal(d3.schemeCategory10);
+const regionColorScale = d3.scaleOrdinal()
+    .range(['#1f77b4', '#ff7f0e', '#00CC99', '#b3584a', '#9467bd',
+        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']);
+
 
 // Country name mapping for variations
 const countryNameMapping = {
@@ -82,9 +86,25 @@ function initMap(countryFlows, countries, geoData) {
     mapSvg = container.append("svg")
         .attr("width", width)
         .attr("height", height)
-        .attr("viewBox", `0 0 ${width} ${height}`)
-        .attr("preserveAspectRatio", "xMidYMid slice")
         .style("background-color", "#aed9e0");
+
+    const zoomGroup = mapSvg.append("g")
+        .attr("class", "zoom-group");
+
+    const zoom = d3.zoom()
+        .scaleExtent([0.5, 8])
+        .on("zoom", (event) => {
+            zoomGroup.attr("transform", event.transform);
+        });
+
+    mapSvg.call(zoom).on("dblclick.zoom", null);
+
+    mapSvg.on("dblclick", () => {
+        mapSvg.transition()
+            .duration(500)
+            .call(zoom.transform, d3.zoomIdentity);
+    });
+
 
     // Add click handler for ocean (background)
     mapSvg.on("click", function(event) {
@@ -112,7 +132,7 @@ function initMap(countryFlows, countries, geoData) {
 
     // Add graticule
     const graticule = d3.geoGraticule10();
-    mapSvg.append("path")
+    zoomGroup.append("path")
         .datum(graticule)
         .attr("class", "graticule")
         .attr("d", mapPathGenerator)
@@ -127,11 +147,11 @@ function initMap(countryFlows, countries, geoData) {
     regionColorScale.domain(uniqueRegionIds);
 
     // Group for regions
-    const regionsGroup = mapSvg.append("g")
+    const regionsGroup = zoomGroup.append("g")
         .attr("class", "regions");
 
     // Group for countries
-    const countriesGroup = mapSvg.append("g")
+    const countriesGroup = zoomGroup.append("g")
         .attr("class", "countries");
 
     // Draw countries with initial neutral state
@@ -201,7 +221,7 @@ function initMap(countryFlows, countries, geoData) {
             });
     });
 
-    mapSvg.append("g").attr("id", "flow-lines");
+    zoomGroup.append("g").attr("id", "flow-lines");
     setupArrowMarkers(mapSvg);
 }
 
@@ -354,7 +374,7 @@ function handleRegionClick(regionId, element, regionColor) {
         // Select new region
         selectedRegion = regionId;
         d3.select(element)
-            .attr("fill", `${regionColor}33`)
+            .attr("fill", `${regionColor}99`)
             .attr("stroke-width", 4);
         
         // Update country interactions and appearance
@@ -804,3 +824,4 @@ function showGlobalLineChart() {
     }
     d3.select("#explanation-box").style("display", "none");
 }
+
