@@ -491,43 +491,71 @@ function setupArrowMarkers(svg) {
 }
 
 // Helper function to create curved path
-function createCurvedPath(source, target, isOutflow) {
+function createCurvedPath(source, target, useClockwiseArc) {
     const dx = target.x - source.x;
     const dy = target.y - source.y;
-    const dr = Math.sqrt(dx * dx + dy * dy)*3;
-    
-    // Determine curve direction based on flow type and relative positions
-    const curve = isOutflow ? 1 : -1;
-    const sweep = dx * dy > 0 ? 1 : 0;
-    
-    return `M${source.x},${source.y}A${dr},${dr} 0 0,${sweep * curve} ${target.x},${target.y}`;
+    const curvature_multiplier = 1.5; // Adjust for more/less curve. Original was 3 (flatter). 1 is very curved.
+    const dr = Math.sqrt(dx * dx + dy * dy) * curvature_multiplier;
+
+    if (dr === 0) {
+        return `M${source.x},${source.y}L${target.x},${target.y}`;
+    }
+    const sweepFlag = useClockwiseArc ? 1 : 0;
+    return `M${source.x},${source.y}A${dr},${dr} 0 0,${sweepFlag} ${target.x},${target.y}`;
 }
 
 function drawFlowsForRegion(regionId) {
     const flowLinesGroup = mapSvg.select("g#flow-lines");
     flowLinesGroup.selectAll("*").remove();
 
-    // Get region flows for the selected region from region flows data
-    const relatedFlows = mapRegionFlowDataCache.filter(
-        f => f.from_region_id === +regionId || f.to_region_id === +regionId
-    );
+    const selectedRegionIdNum = +regionId;
 
-    // Get region centroids by aggregating country centroids
+    // Aggregate flows by the other region
+    const flowsByOtherRegion = new Map();
+    mapRegionFlowDataCache.forEach(flow => {
+        const flowValue = flow[`flow_${window.currentPeriod}`] || 0;
+        if (flowValue <= 0) return;
+
+        let otherRegionId;
+        let isOutflowFromSelected = false;
+
+        if (flow.from_region_id === selectedRegionIdNum && flow.to_region_id !== selectedRegionIdNum) {
+            otherRegionId = flow.to_region_id;
+            isOutflowFromSelected = true;
+        } else if (flow.to_region_id === selectedRegionIdNum && flow.from_region_id !== selectedRegionIdNum) {
+            otherRegionId = flow.from_region_id;
+            isOutflowFromSelected = false;
+        } else {
+            return; // Skip self-loops or flows not involving the selected region as one end
+        }
+
+        if (!flowsByOtherRegion.has(otherRegionId)) {
+            flowsByOtherRegion.set(otherRegionId, {
+                outflow: 0, // Flow from selectedRegion to otherRegion
+                inflow: 0,  // Flow from otherRegion to selectedRegion
+                otherRegionId: otherRegionId
+            });
+        }
+        const aggregated = flowsByOtherRegion.get(otherRegionId);
+        if (isOutflowFromSelected) {
+            aggregated.outflow += flowValue;
+        } else {
+            aggregated.inflow += flowValue;
+        }
+    });
+
     const regionCentroids = {};
     mapCountryDataCache.forEach(country => {
         const countryFeature = mapGeoDataCache.features.find(f => {
-            return f.properties.name === country.country_name;
+            const cData = getCountryData(f); // Use existing getCountryData
+            return cData && cData.country_id === country.country_id;
         });
         
         if (countryFeature) {
             const centroid = mapPathGenerator.centroid(countryFeature);
             if (!isNaN(centroid[0]) && !isNaN(centroid[1])) {
                 if (!regionCentroids[country.region_id]) {
-                    regionCentroids[country.region_id] = {
-                        sumX: 0,
-                        sumY: 0,
-                        count: 0
-                    };
+                    regionCentroids[country.region_id] = { sumX: 0, sumY: 0, count: 0 };
                 }
                 regionCentroids[country.region_id].sumX += centroid[0];
                 regionCentroids[country.region_id].sumY += centroid[1];
@@ -535,138 +563,148 @@ function drawFlowsForRegion(regionId) {
             }
         }
     });
-
-    // Calculate average centroids for each region
     Object.keys(regionCentroids).forEach(rid => {
         const region = regionCentroids[rid];
-        region.x = region.sumX / region.count;
-        region.y = region.sumY / region.count;
+        if (region.count > 0) {
+            region.x = region.sumX / region.count;
+            region.y = region.sumY / region.count;
+        } else { region.x = 0; region.y = 0;}
     });
 
-    // Get region names for tooltips
-    const regionNames = {};
-    allData.regions.forEach(r => {
-        regionNames[r.region_id] = r.region_name;
-    });
+    const regionIdToName = new Map(allData.regions.map(r => [r.region_id, r.region_name]));
+    const selectedRegionName = regionIdToName.get(selectedRegionIdNum) || `Region ${selectedRegionIdNum}`;
 
-    // Draw flows
-    relatedFlows.forEach(flow => {
-        const flowValue = flow[`flow_${window.currentPeriod}`] || 0;
-        if (flowValue <= 0 || flow.from_region_id === flow.to_region_id) return;
+    flowsByOtherRegion.forEach(aggFlow => {
+        const otherRegionName = regionIdToName.get(aggFlow.otherRegionId) || `Region ${aggFlow.otherRegionId}`;
+        const outflowVal = aggFlow.outflow;
+        const inflowVal = aggFlow.inflow;
 
-        const sourceRegion = regionCentroids[flow.from_region_id];
-        const targetRegion = regionCentroids[flow.to_region_id];
+        if (outflowVal === 0 && inflowVal === 0) return;
 
-        if (sourceRegion && targetRegion) {
-            const isOutflow = flow.from_region_id === +regionId;
-            
-            // Skip if it's an inflow with zero value
-            if (!isOutflow && flowValue <= 0) return;
+        let dominantIsOutflow; // True if dominant flow is from selected region to other region
+        let pathValue; // Value for stroke width
 
-            const fromRegionName = regionNames[flow.from_region_id] || `Region ${flow.from_region_id}`;
-            const toRegionName = regionNames[flow.to_region_id] || `Region ${flow.to_region_id}`;
-            
-            const pathData = {
-                sourceName: fromRegionName,
-                targetName: toRegionName,
-                value: flowValue,
-                period: window.currentPeriod,
-                isOutflow: isOutflow
-            };
-
-            flowLinesGroup.append("path")
-                .datum(pathData)
-                .attr("d", () => createCurvedPath(sourceRegion, targetRegion, isOutflow))
-                .attr("fill", "none")
-                .attr("stroke", d => d.isOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)")
-                .attr("stroke-opacity", 0.6)
-                .attr("stroke-width", d => Math.max(0.75, Math.log10(d.value + 1) / 1.5))
-                .attr("marker-end", d => d.isOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
-                .style("pointer-events", "all")
-                .classed("flow-line", true)
-                .on("mouseover", (event, d) => {
-                    const currentPath = d3.select(event.currentTarget);
-                    currentPath
-                        .attr("stroke-width", Math.max(1.5, Math.log10(d.value + 1)))
-                        .attr("stroke-opacity", 1);
-                    
-                    mapTooltip
-                        .transition().duration(200).style("opacity", .9);
-                    const tooltipText = `${d.sourceName} → ${d.targetName}<br>Total Flow: ${d.value.toLocaleString()}`;
-                    mapTooltip
-                        .html(tooltipText)
-                        .style("left", (event.pageX + 10) + "px")
-                        .style("top", (event.pageY - 10) + "px");
-                })
-                .on("mouseout", (event, d) => {
-                    const currentPath = d3.select(event.currentTarget);
-                    currentPath
-                        .attr("stroke-width", Math.max(0.75, Math.log10(d.value + 1) / 1.5))
-                        .attr("stroke-opacity", 0.6);
-                    
-                    mapTooltip.transition().duration(200).style("opacity", 0);
-                });
+        if (outflowVal >= inflowVal) {
+            dominantIsOutflow = true;
+            pathValue = outflowVal;
+        } else {
+            dominantIsOutflow = false;
+            pathValue = inflowVal;
         }
+        if (pathValue === 0) return; // Both were zero or became zero
+
+        const selectedCentroid = regionCentroids[selectedRegionIdNum];
+        const otherCentroid = regionCentroids[aggFlow.otherRegionId];
+
+        if (!selectedCentroid || !otherCentroid || selectedCentroid.count === 0 || otherCentroid.count === 0) return;
+
+        const pathSourceCoords = dominantIsOutflow ? selectedCentroid : otherCentroid;
+        const pathTargetCoords = dominantIsOutflow ? otherCentroid : selectedCentroid;
+        
+        // Consistent curve based on region IDs
+        const useClockwiseArc = selectedRegionIdNum < aggFlow.otherRegionId;
+
+        const pathData = {
+            selectedEntityName: selectedRegionName,
+            otherEntityName: otherRegionName,
+            outflowDisplayValue: outflowVal, // From selected to other
+            inflowDisplayValue: inflowVal,   // From other to selected
+            valueForStroke: pathValue,
+            dominantIsOutflow: dominantIsOutflow // For color/arrow: true if selected -> other is dominant
+        };
+
+        flowLinesGroup.append("path")
+            .datum(pathData)
+            .attr("d", () => createCurvedPath(pathSourceCoords, pathTargetCoords, useClockwiseArc))
+            .attr("fill", "none")
+            .attr("stroke", d => d.dominantIsOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)")
+            .attr("stroke-opacity", 0.7)
+            .attr("stroke-width", d => Math.max(0.75, Math.log10(d.valueForStroke + 1) / 1.2))
+            .attr("marker-end", d => d.dominantIsOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
+            .style("pointer-events", "all")
+            .classed("flow-line", true)
+            .on("mouseover", (event, d) => {
+                d3.select(event.currentTarget).attr("stroke-opacity", 1).attr("stroke-width", Math.max(1.5, Math.log10(d.valueForStroke + 1)));
+                mapTooltip.transition().duration(200).style("opacity", .9);
+                const tooltipText = `<b>${d.selectedEntityName} → ${d.otherEntityName}:</b> ${d.outflowDisplayValue.toLocaleString()}<br>` +
+                                  `<b>${d.otherEntityName} → ${d.selectedEntityName}:</b> ${d.inflowDisplayValue.toLocaleString()}`;
+                mapTooltip.html(tooltipText)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+            })
+            .on("mouseout", (event, d) => {
+                d3.select(event.currentTarget).attr("stroke-opacity", 0.7).attr("stroke-width", Math.max(0.75, Math.log10(d.valueForStroke + 1) / 1.2));
+                mapTooltip.transition().duration(200).style("opacity", 0);
+            });
     });
 }
+
 
 function drawFlowsForSelectedCountry(selectedMapFeature) {
     const flowLinesGroup = mapSvg.select("g#flow-lines");
     flowLinesGroup.selectAll("*").remove();
 
-    if (!mapCountryDataCache || !mapFlowDataCache) {
-        console.warn("drawFlows: Country or flow data not available in cache.");
-        return;
-    }
+    if (!mapCountryDataCache || !mapFlowDataCache) return;
 
     const mapCountryName = selectedMapFeature.properties.name;
     const mappedName = countryNameMapping[mapCountryName] || mapCountryName;
     const selectedCountryCSV = mapCountryDataCache.find(c => c.country_name === mappedName);
 
-    if (!selectedCountryCSV) {
-        console.warn(`drawFlows: Could not find CSV country for '${mappedName}' (original: '${mapCountryName}')`);
-        return;
-    }
+    if (!selectedCountryCSV) return;
+    const selectedCountryIdNum = selectedCountryCSV.country_id;
 
-    const selectedCountryIdForFlows = selectedCountryCSV.country_id;
-
-    let sourceCentroid;
+    let selectedCountryCentroidCoords;
     try {
-        sourceCentroid = mapPathGenerator.centroid(selectedMapFeature);
-        if (isNaN(sourceCentroid[0]) || isNaN(sourceCentroid[1])) throw new Error("Centroid NaN.");
+        const centroid = mapPathGenerator.centroid(selectedMapFeature);
+        if (isNaN(centroid[0]) || isNaN(centroid[1])) throw new Error("Centroid NaN.");
+        selectedCountryCentroidCoords = { x: centroid[0], y: centroid[1] };
     } catch (e) {
-        console.error(`Error calculating centroid for ${mapCountryName}:`, e);
-        const freshFeature = mapGeoDataCache.features.find(f => f.id === selectedMapFeature.id);
-        if (!freshFeature) return;
-        try {
-            sourceCentroid = mapPathGenerator.centroid(freshFeature);
-            if (isNaN(sourceCentroid[0]) || isNaN(sourceCentroid[1])) throw new Error("Still NaN.");
-        } catch (e2) {
-            console.error("Centroid recovery failed:", e2);
-            return;
-        }
+        console.error(`Error calculating centroid for ${mapCountryName}:`, e); return;
     }
 
-    const relatedFlows = mapFlowDataCache.filter(
-        f => f.from_country_id === selectedCountryIdForFlows || f.to_country_id === selectedCountryIdForFlows
-    );
+    // Aggregate flows by other country
+    const flowsByOtherCountry = new Map();
+    mapFlowDataCache.forEach(flow => {
+        const flowValue = flow[`flow_${window.currentPeriod}`] || 0;
+        if (flowValue <= 0) return;
 
-    relatedFlows.forEach(flow => {
-        let targetCountryCSVId, flowValue, isOutflow;
-        if (flow.from_country_id === selectedCountryIdForFlows) {
-            targetCountryCSVId = flow.to_country_id;
-            isOutflow = true;
+        let otherCountryId;
+        let isOutflowFromSelected = false;
+
+        if (flow.from_country_id === selectedCountryIdNum && flow.to_country_id !== selectedCountryIdNum) {
+            otherCountryId = flow.to_country_id;
+            isOutflowFromSelected = true;
+        } else if (flow.to_country_id === selectedCountryIdNum && flow.from_country_id !== selectedCountryIdNum) {
+            otherCountryId = flow.from_country_id;
+            isOutflowFromSelected = false;
         } else {
-            targetCountryCSVId = flow.from_country_id;
-            isOutflow = false;
+            return; // Skip self-loops or irrelevant flows
         }
-        flowValue = flow[`flow_${window.currentPeriod}`] || 0;
         
-        // Skip if no flow or self-loop, or if it's an inflow with zero value
-        if (flowValue <= 0 || targetCountryCSVId === selectedCountryIdForFlows || (!isOutflow && flowValue <= 0)) return;
-
-        const otherCountryCSV = mapCountryDataCache.find(c => c.country_id === targetCountryCSVId);
+        const otherCountryCSV = mapCountryDataCache.find(c => c.country_id === otherCountryId);
         if (!otherCountryCSV) return;
+
+        if (!flowsByOtherCountry.has(otherCountryId)) {
+            flowsByOtherCountry.set(otherCountryId, {
+                outflow: 0, // Flow from selectedCountry to otherCountry
+                inflow: 0,  // Flow from otherCountry to selectedCountry
+                otherCountryCSV: otherCountryCSV
+            });
+        }
+        const aggregated = flowsByOtherCountry.get(otherCountryId);
+        if (isOutflowFromSelected) {
+            aggregated.outflow += flowValue;
+        } else {
+            aggregated.inflow += flowValue;
+        }
+    });
+
+    flowsByOtherCountry.forEach(aggFlow => {
+        const otherCountryCSV = aggFlow.otherCountryCSV;
+        const outflowVal = aggFlow.outflow;
+        const inflowVal = aggFlow.inflow;
+
+        if (outflowVal === 0 && inflowVal === 0) return;
 
         const otherMapFeature = mapGeoDataCache.features.find(f => {
             const geoName = f.properties.name;
@@ -675,62 +713,70 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
         });
         if (!otherMapFeature) return;
 
-        let targetCentroid;
+        let otherCountryCentroidCoords;
         try {
-            targetCentroid = mapPathGenerator.centroid(otherMapFeature);
-            if (isNaN(targetCentroid[0]) || isNaN(targetCentroid[1])) throw new Error("Target centroid NaN.");
+            const centroid = mapPathGenerator.centroid(otherMapFeature);
+            if (isNaN(centroid[0]) || isNaN(centroid[1])) throw new Error("Target centroid NaN.");
+            otherCountryCentroidCoords = { x: centroid[0], y: centroid[1] };
         } catch (e) {
-            console.error(`Error getting centroid for ${otherCountryCSV.country_name}:`, e);
-            return;
+            console.error(`Error getting centroid for ${otherCountryCSV.country_name}:`, e); return;
         }
 
-        const source = { x: sourceCentroid[0], y: sourceCentroid[1] };
-        const target = { x: targetCentroid[0], y: targetCentroid[1] };
+        let dominantIsOutflow; // True if dominant flow is from selected country to other country
+        let pathValue;
+
+        if (outflowVal >= inflowVal) {
+            dominantIsOutflow = true;
+            pathValue = outflowVal;
+        } else {
+            dominantIsOutflow = false;
+            pathValue = inflowVal;
+        }
+        if (pathValue === 0) return;
+
+
+        const pathSourceCoords = dominantIsOutflow ? selectedCountryCentroidCoords : otherCountryCentroidCoords;
+        const pathTargetCoords = dominantIsOutflow ? otherCountryCentroidCoords : selectedCountryCentroidCoords;
+
+        // Consistent curve based on country IDs
+        const useClockwiseArc = selectedCountryIdNum < otherCountryCSV.country_id;
 
         const pathData = {
-            sourceName: isOutflow ? selectedCountryCSV.country_name : otherCountryCSV.country_name,
-            targetName: isOutflow ? otherCountryCSV.country_name : selectedCountryCSV.country_name,
-            value: flowValue,
-            period: window.currentPeriod,
-            isOutflow: isOutflow
+            selectedEntityName: selectedCountryCSV.country_name,
+            otherEntityName: otherCountryCSV.country_name,
+            outflowDisplayValue: outflowVal, // From selected to other
+            inflowDisplayValue: inflowVal,   // From other to selected
+            valueForStroke: pathValue,
+            dominantIsOutflow: dominantIsOutflow // For color/arrow: true if selected -> other is dominant
         };
 
-        const lineElement = flowLinesGroup.append("path")
+        flowLinesGroup.append("path")
             .datum(pathData)
-            .attr("d", () => createCurvedPath(source, target, isOutflow))
+            .attr("d", () => createCurvedPath(pathSourceCoords, pathTargetCoords, useClockwiseArc))
             .attr("fill", "none")
-            .attr("stroke", d => d.isOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)")
-            .attr("stroke-opacity", 0.6)
-            .attr("stroke-width", d => Math.max(0.75, Math.log10(d.value + 1) / 1.5))
-            .attr("marker-end", d => d.isOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
+            .attr("stroke", d => d.dominantIsOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)")
+            .attr("stroke-opacity", 0.7)
+            .attr("stroke-width", d => Math.max(0.75, Math.log10(d.valueForStroke + 1) / 1.2))
+            .attr("marker-end", d => d.dominantIsOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
             .style("pointer-events", "all")
-            .classed("flow-line", true);
-
-        lineElement
+            .classed("flow-line", true)
             .on("mouseover", (event, d) => {
-                const currentLine = d3.select(event.currentTarget);
-                currentLine
-                    .attr("stroke-width", Math.max(1.5, Math.log10(d.value + 1)))
-                    .attr("stroke-opacity", 1);
-                
-                mapTooltip
-                    .transition().duration(200).style("opacity", .9);
-                const tooltipText = `${d.sourceName} → ${d.targetName}<br>Total Flow: ${d.value.toLocaleString()}`;
-                mapTooltip
-                    .html(tooltipText)
+                d3.select(event.currentTarget).attr("stroke-opacity", 1).attr("stroke-width", Math.max(1.5, Math.log10(d.valueForStroke + 1)));
+                mapTooltip.transition().duration(200).style("opacity", .9);
+                const tooltipText = `<b>${d.selectedEntityName} → ${d.otherEntityName}:</b> ${d.outflowDisplayValue.toLocaleString()}<br>` +
+                                  `<b>${d.otherEntityName} → ${d.selectedEntityName}:</b> ${d.inflowDisplayValue.toLocaleString()}`;
+                mapTooltip.html(tooltipText)
                     .style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY - 10) + "px");
             })
             .on("mouseout", (event, d) => {
-                const currentLine = d3.select(event.currentTarget);
-                currentLine
-                    .attr("stroke-width", Math.max(0.75, Math.log10(d.value + 1) / 1.5))
-                    .attr("stroke-opacity", 0.6);
-                
+                d3.select(event.currentTarget).attr("stroke-opacity", 0.7).attr("stroke-width", Math.max(0.75, Math.log10(d.valueForStroke + 1) / 1.2));
                 mapTooltip.transition().duration(200).style("opacity", 0);
             });
     });
 }
+
+
 
 function handleOceanClick() {
     // Deselect any selected region
