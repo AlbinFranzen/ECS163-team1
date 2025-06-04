@@ -802,4 +802,5 @@ function showGlobalLineChart() {
     if (typeof initLineChart === "function") {
         initLineChart(mapFlowDataCache, mapCountryDataCache);
     }
+    d3.select("#explanation-box").style("display", "none");
 }
