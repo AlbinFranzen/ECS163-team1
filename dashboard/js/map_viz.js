@@ -494,7 +494,7 @@ function setupArrowMarkers(svg) {
 function createCurvedPath(source, target, isOutflow) {
     const dx = target.x - source.x;
     const dy = target.y - source.y;
-    const dr = Math.sqrt(dx * dx + dy * dy);
+    const dr = Math.sqrt(dx * dx + dy * dy)*3;
     
     // Determine curve direction based on flow type and relative positions
     const curve = isOutflow ? 1 : -1;
