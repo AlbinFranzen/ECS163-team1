@@ -13,7 +13,7 @@
     <header>
         <h1>Global Migration Flows Dashboard</h1>
     </header>
-    
+
 
     <div class="dashboard-container">
         <div class="dashboard-main">
@@ -35,8 +35,18 @@
             <main class="main-content">
                 <div class="map-container" id="map-container">
                     <h2>Interactive Migration Map</h2>
+
+                    <!-- Flow control slider -->
+                    <div class="flow-control" id="flow-control" style="display:none;">
+                        <label for="arrow-count-slider">Number of Arrows:</label>
+                        <input type="range" id="arrow-count-slider" min="1" max="50" value="10" step="1">
+                        <div class="slider-value">
+                            Showing <span id="current-arrow-count">10</span> of <span id="max-arrow-count">50</span>
+                        </div>
+                    </div>
+
                     <div id="map-visualization"><!-- … --></div>
-                    
+
                     <!-- moved explanation box here -->
                     <div id="explanation-box" class="explanation-box" style="display:none;"></div>
                 </div>
@@ -64,7 +74,9 @@
 
     <footer>
         <p>ECS163 Data Visualization Project - Team 1</p>
-        <p><small>Flow data from: Abel & Sander (2014). Explanations data fetched from <a href="https://gmdac.iom.int/national-and-regional-migration-profile-repository">UN migration profiles</a>, contact us for exact profile details.</small></p>
+        <p><small>Flow data from: Abel & Sander (2014). Explanations data fetched from <a
+                    href="https://gmdac.iom.int/national-and-regional-migration-profile-repository">UN migration
+                    profiles</a>, contact us for exact profile details.</small></p>
     </footer>
 
     <!-- D3.js Library -->

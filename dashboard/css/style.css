@@ -5,8 +5,10 @@ body {
     /* use viewport height for full screen */
     margin: 0;
     padding: 0;
-    overflow: hidden;
-    /* prevent page scroll, let internal flexbox handle it */
+    overflow-x: hidden;
+    /* prevent horizontal scroll, but allow vertical scroll if needed */
+    overflow-y: auto;
+    /* allow vertical scrolling when content doesn't fit */
 }
 
 body {
@@ -17,14 +19,18 @@ body {
     display: flex;
     flex-direction: column;
     /* Stack header, dashboard, footer */
+    min-height: 100vh;
+    /* ensure body takes at least full viewport height */
 }
+
 footer a {
-  color: lightblue;
+    color: lightblue;
 }
+
 .flow-line:selected-flow,
 .flow-line.selected-flow {
-  stroke: gold !important;
-  stroke-width: 2.5 !important;
+    stroke: gold !important;
+    stroke-width: 2.5 !important;
 }
 
 /* Header */
@@ -51,7 +57,9 @@ header h1 {
     /* Stack intro and main dashboard */
     width: 100%;
     box-sizing: border-box;
-    overflow: hidden;
+    overflow: visible;
+    /* allow content to be visible and scrollable */
+    min-height: 0;
 }
 
 /* New container for intro and charts */
@@ -60,6 +68,8 @@ header h1 {
     display: flex;
     padding: 20px;
     gap: 20px;
+    min-height: 500px;
+    /* ensure minimum usable height */
 }
 
 /* Sidebar (left panels) - reduced width to eliminate empty space */
@@ -69,7 +79,8 @@ header h1 {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    min-width: 350px;
+    min-width: 300px;
+    /* reduced min-width for better mobile behavior */
     max-width: 600px;
     /* reduced to give more space to map */
 }
@@ -80,7 +91,8 @@ header h1 {
     /* 60% of sidebar height - larger for better readability */
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-height: 250px;
+    /* ensure minimum usable height */
 }
 
 /* Line chart - smaller space (40%) */
@@ -89,7 +101,8 @@ header h1 {
     /* 40% of sidebar height - adequate for temporal trends */
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-height: 200px;
+    /* ensure minimum usable height for line chart */
 }
 
 /* Main Content / Map Area - increased for better map visibility */
@@ -107,12 +120,42 @@ header h1 {
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    /* allow shrink */
+    min-height: 300px;
+    /* ensure map has minimum usable height */
+    position: relative;
 }
 
-.map-container {
-  position: relative;
+/* Flow control slider in top-left of map */
+.flow-control {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px 12px;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    z-index: 15;
+    font-size: 0.85em;
+    min-width: 140px;
+}
+
+.flow-control label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #333;
+}
+
+.flow-control input[type="range"] {
+    width: 100%;
+    margin: 4px 0;
+}
+
+.flow-control .slider-value {
+    font-size: 0.8em;
+    color: #666;
+    text-align: center;
+    margin-top: 4px;
 }
 
 /* Chart & Map Panel Styling */
@@ -152,10 +195,12 @@ header h1 {
     font-size: 0.9em;
     /* slightly smaller to fit in compact space */
     color: #444;
-    max-height: 200px;
-    /* limit height so it doesn't dominate */
+    max-height: 180px;
+    /* slightly reduced max height */
     overflow-y: auto;
     /* scroll if content is too long */
+    flex-shrink: 0;
+    /* prevent this from shrinking too much */
 }
 
 .dashboard-intro p {
@@ -164,16 +209,16 @@ header h1 {
 }
 
 .explanation-box {
-  position: absolute;
-  bottom: 14px;
-  left: 14px;
-  max-width: 200px;
-  background: rgba(255,255,255,0.8);
-  padding: 8px 12px;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  z-index: 10;
-  font-size: 0.8em
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    max-width: 200px;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 8px 12px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    font-size: 0.8em
 }
 
 .period-buttons {
@@ -201,7 +246,7 @@ header h1 {
     text-align: left;
     padding: 6px 10px;
     font-size: 13px;
-    background: rgba(255,255,255, 0.9);
+    background: rgba(255, 255, 255, 0.9);
     color: black;
     border: 1px solid #555;
     border-radius: 4px;
@@ -236,7 +281,8 @@ footer p:last-child {
     width: 100%;
     height: 100%;
     flex: 1;
-    min-height: 0;
+    min-height: 200px;
+    /* ensure minimum height for chord diagram */
     min-width: 0;
     /* allow full shrink and expand */
     display: block;
@@ -247,7 +293,8 @@ footer p:last-child {
     width: 100%;
     height: 100%;
     flex: 1;
-    min-height: 0;
+    min-height: 150px;
+    /* ensure minimum height for line chart */
     min-width: 0;
     /* allow full shrink and expand */
     display: block;
@@ -258,8 +305,8 @@ footer p:last-child {
     width: 100%;
     height: 100%;
     flex: 1;
-    min-height: 400px;
-    /* maps need adequate height for geographic detail */
+    min-height: 250px;
+    /* reduced minimum height for better mobile behavior */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -281,10 +328,22 @@ footer p:last-child {
 }
 
 /* Responsive Adjustments */
+@media (max-width: 1200px) {
+    .dashboard-main {
+        gap: 15px;
+        padding: 15px;
+    }
+
+    .sidebar {
+        min-width: 280px;
+    }
+}
+
 @media (max-width: 900px) {
     .dashboard-main {
         flex-direction: column;
-        overflow-y: auto;
+        min-height: auto;
+        /* allow natural height on mobile */
     }
 
     .sidebar,
@@ -300,15 +359,18 @@ footer p:last-child {
     }
 
     #chord-diagram-container {
-        min-height: 400px;
+        min-height: 300px;
+        /* increased for mobile */
     }
 
     #line-chart-container {
-        min-height: 320px;
+        min-height: 250px;
+        /* increased for mobile */
     }
 
     .map-container {
-        min-height: 400px;
+        min-height: 300px;
+        /* reduced for mobile */
         flex: 2;
         /* give map more space than intro on mobile */
     }
@@ -317,6 +379,30 @@ footer p:last-child {
         flex: 1;
         max-height: none;
         /* remove height restriction on mobile */
+    }
+}
+
+@media (max-width: 600px) {
+    .main-content {
+        flex-direction: column;
+        /* stack map and intro vertically on small screens */
+    }
+
+    .dashboard-main {
+        gap: 10px;
+        padding: 10px;
+    }
+
+    #chord-diagram-container {
+        min-height: 250px;
+    }
+
+    #line-chart-container {
+        min-height: 200px;
+    }
+
+    .map-container {
+        min-height: 250px;
     }
 }
 
@@ -332,5 +418,17 @@ footer p:last-child {
 
     .tooltip {
         font-size: 0.8em;
+    }
+
+    .sidebar {
+        min-width: 250px;
+    }
+
+    #chord-diagram-container {
+        min-height: 200px;
+    }
+
+    #line-chart-container {
+        min-height: 180px;
     }
 }

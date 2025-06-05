@@ -5,6 +5,9 @@ let mapGeoDataCache, mapCountryDataCache, mapFlowDataCache, mapRegionFlowDataCac
 let selectedRegion = null; // Track currently selected region
 let selectedCountry = null; // Track currently selected country
 
+// Flow control variables
+let maxArrowCount = 10; // Default to show 10 arrows
+let currentFlowData = null; // Store current flow data for re-rendering
 
 // Add color scale to match chord diagram
 const regionColorScale = d3.scaleOrdinal()
@@ -14,37 +17,37 @@ const regionColorScale = d3.scaleOrdinal()
 
 // Country name mapping for variations
 const countryNameMapping = {
-  'W. Sahara': 'Western Sahara',               // ESH
-  'United States of America': 'United States', // USA
-  'Dem. Rep. Congo': 'DR Congo',                // COD
-  'Dominican Rep.': 'Dominican Republic',       // DOM
-  'Falkland Is.': 'Falkland Islands',           // Not in CSV, may need special handling or skip
-  'Greenland': 'Greenland',                      // Not in CSV, may need special handling or skip
-  'Fr. S. Antarctic Lands': 'French Southern Antarctic Lands', // Not in CSV, skip or special
-  "Côte d'Ivoire": 'Ivory Coast',                // CIV
-  'Central African Rep.': 'Central African Republic', // CAF
-  'Eq. Guinea': 'Equatorial Guinea',             // GNQ
-  'eSwatini': 'Swaziland',                        // SWZ (Swaziland renamed eSwatini)
-  'Solomon Is.': 'Solomon Islands',              // SLB
-  'Taiwan': 'Taiwan',                             // Not in CSV, skip or add custom
-  'Czechia': 'Czech Republic',                    // CZE
-  'Antarctica': 'Antarctica',                     // Not in CSV, skip or add custom
-  'N. Cyprus': 'Cyprus',                          // CYP (Northern Cyprus not recognized separately)
-  'Somaliland': 'Somaliland',                     // Not in CSV, skip or add custom
-  'Bosnia and Herz.': 'Bosnia & Herzegovina',    // BIH
-  'Kosovo': 'Kosovo',                             // Not in CSV, skip or add custom
-  'Trinidad and Tobago': 'Trinidad & Tobago',    // TTO
-  'S. Sudan': 'South Sudan'                       // SSD
+    'W. Sahara': 'Western Sahara',               // ESH
+    'United States of America': 'United States', // USA
+    'Dem. Rep. Congo': 'DR Congo',                // COD
+    'Dominican Rep.': 'Dominican Republic',       // DOM
+    'Falkland Is.': 'Falkland Islands',           // Not in CSV, may need special handling or skip
+    'Greenland': 'Greenland',                      // Not in CSV, may need special handling or skip
+    'Fr. S. Antarctic Lands': 'French Southern Antarctic Lands', // Not in CSV, skip or special
+    "Côte d'Ivoire": 'Ivory Coast',                // CIV
+    'Central African Rep.': 'Central African Republic', // CAF
+    'Eq. Guinea': 'Equatorial Guinea',             // GNQ
+    'eSwatini': 'Swaziland',                        // SWZ (Swaziland renamed eSwatini)
+    'Solomon Is.': 'Solomon Islands',              // SLB
+    'Taiwan': 'Taiwan',                             // Not in CSV, skip or add custom
+    'Czechia': 'Czech Republic',                    // CZE
+    'Antarctica': 'Antarctica',                     // Not in CSV, skip or add custom
+    'N. Cyprus': 'Cyprus',                          // CYP (Northern Cyprus not recognized separately)
+    'Somaliland': 'Somaliland',                     // Not in CSV, skip or add custom
+    'Bosnia and Herz.': 'Bosnia & Herzegovina',    // BIH
+    'Kosovo': 'Kosovo',                             // Not in CSV, skip or add custom
+    'Trinidad and Tobago': 'Trinidad & Tobago',    // TTO
+    'S. Sudan': 'South Sudan'                       // SSD
 };
 
 
 
 function getCountryData(geoFeature) {
     if (!geoFeature || !geoFeature.properties || !geoFeature.properties.name) return null;
-    
+
     // Try direct match first
     let country = mapCountryDataCache.find(c => c.country_name === geoFeature.properties.name);
-    
+
     // If no match, try mapped name
     if (!country && countryNameMapping[geoFeature.properties.name]) {
         country = mapCountryDataCache.find(c => c.country_name === countryNameMapping[geoFeature.properties.name]);
@@ -107,7 +110,7 @@ function initMap(countryFlows, countries, geoData) {
 
 
     // Add click handler for ocean (background)
-    mapSvg.on("click", function(event) {
+    mapSvg.on("click", function (event) {
         // Check if click was on the background (ocean)
         if (event.target === this) {
             handleOceanClick();
@@ -142,7 +145,7 @@ function initMap(countryFlows, countries, geoData) {
 
     // Get unique region IDs and sort them
     const uniqueRegionIds = [...new Set(mapCountryDataCache.map(c => c.region_id))].sort((a, b) => a - b);
-    
+
     // Set up color scale domain
     regionColorScale.domain(uniqueRegionIds);
 
@@ -202,27 +205,30 @@ function initMap(countryFlows, countries, geoData) {
             .attr("stroke", regionColor)
             .attr("stroke-width", 3)
             .style("pointer-events", "all")
-            .on("mouseover", function() {
+            .on("mouseover", function () {
                 if (selectedRegion !== regionId) {
                     d3.select(this)
                         .attr("fill", `${regionColor}33`)
                         .attr("stroke-width", 4);
                 }
             })
-            .on("mouseout", function() {
+            .on("mouseout", function () {
                 if (selectedRegion !== regionId) {
                     d3.select(this)
                         .attr("fill", "transparent")
                         .attr("stroke-width", 3);
                 }
             })
-            .on("click", function() {
+            .on("click", function () {
                 handleRegionClick(regionId, this, regionColor);
             });
     });
 
     zoomGroup.append("g").attr("id", "flow-lines");
     setupArrowMarkers(mapSvg);
+
+    // Setup flow control slider
+    setupFlowControlSlider();
 }
 
 function drawFlowsForSelectedRegion(regionId) {
@@ -240,7 +246,7 @@ function drawFlowsForSelectedRegion(regionId) {
         const countryFeature = mapGeoDataCache.features.find(f => {
             return f.properties.name === country.country_name;
         });
-        
+
         if (countryFeature) {
             const centroid = mapPathGenerator.centroid(countryFeature);
             if (!isNaN(centroid[0]) && !isNaN(centroid[1])) {
@@ -281,13 +287,13 @@ function drawFlowsForSelectedRegion(regionId) {
 
         if (sourceRegion && targetRegion) {
             const isOutflow = flow.from_region_id === +regionId;
-            
+
             // Skip if it's an inflow with zero value
             if (!isOutflow && flowValue <= 0) return;
 
             const fromRegionName = regionNames[flow.from_region_id] || `Region ${flow.from_region_id}`;
             const toRegionName = regionNames[flow.to_region_id] || `Region ${flow.to_region_id}`;
-            
+
             const pathData = {
                 sourceName: fromRegionName,
                 targetName: toRegionName,
@@ -311,7 +317,7 @@ function drawFlowsForSelectedRegion(regionId) {
                     currentPath
                         .attr("stroke-width", Math.max(1.5, Math.log10(d.value + 1)))
                         .attr("stroke-opacity", 1);
-                    
+
                     mapTooltip
                         .transition().duration(200).style("opacity", .9);
                     const tooltipText = `${d.sourceName} → ${d.targetName}<br>Total Flow: ${d.value.toLocaleString()}`;
@@ -325,7 +331,7 @@ function drawFlowsForSelectedRegion(regionId) {
                     currentPath
                         .attr("stroke-width", Math.max(0.75, Math.log10(d.value + 1) / 1.5))
                         .attr("stroke-opacity", 0.6);
-                    
+
                     mapTooltip.transition().duration(200).style("opacity", 0);
                 });
         }
@@ -339,22 +345,26 @@ function handleRegionClick(regionId, element, regionColor) {
         d3.select(element)
             .attr("fill", "transparent")
             .attr("stroke-width", 3);
-        
+
         // Reset all country interactions and appearance
         mapSvg.selectAll("path.country-shape")
             .style("pointer-events", "none")
             .attr("fill", "#f0e6d2")
             .attr("stroke-width", 0.5);
-        
+
         // Clear selected country if any
         if (selectedCountry) {
             selectedCountry = null;
             mapSvg.selectAll("path.country-shape")
                 .classed("selected-country", false);
         }
-        
+
         // Clear flow lines
         mapSvg.select("g#flow-lines").selectAll("*").remove();
+
+        // Clear flow data and hide flow control
+        currentFlowData = null;
+        hideFlowControl();
 
         // Show global line chart on deselection
         showGlobalLineChart();
@@ -364,44 +374,44 @@ function handleRegionClick(regionId, element, regionColor) {
             mapSvg.select(`path.region-shape[data-region-id="${selectedRegion}"]`)
                 .attr("fill", "transparent")
                 .attr("stroke-width", 3);
-            
+
             // Reset all countries first
             mapSvg.selectAll("path.country-shape")
                 .attr("fill", "#f0e6d2")
                 .attr("stroke-width", 0.5);
         }
-        
+
         // Select new region
         selectedRegion = regionId;
         d3.select(element)
             .attr("fill", `${regionColor}99`)
             .attr("stroke-width", 4);
-        
+
         // Update country interactions and appearance
         mapSvg.selectAll("path.country-shape")
-            .style("pointer-events", function(d) {
+            .style("pointer-events", function (d) {
                 const country = getCountryData(d);
                 return country && country.region_id === +regionId ? "all" : "none";
             })
-            .attr("fill", function(d) {
+            .attr("fill", function (d) {
                 const country = getCountryData(d);
                 if (country && country.region_id === +regionId) {
                     return `${regionColor}22`;
                 }
                 return "#f0e6d2";
             })
-            .attr("stroke-width", function(d) {
+            .attr("stroke-width", function (d) {
                 const country = getCountryData(d);
                 return country && country.region_id === +regionId ? 1 : 0.5;
             });
-            
+
         // Clear selected country if any when changing regions
         if (selectedCountry) {
             selectedCountry = null;
             mapSvg.selectAll("path.country-shape")
                 .classed("selected-country", false);
         }
-        
+
         // Draw flows for the selected region
         drawFlowsForRegion(regionId);
     }
@@ -418,7 +428,7 @@ function handleCountryHover(event, d_feature) {
         const regionColor = regionColorScale(country.region_id);
         element.attr("fill", `${regionColor}66`);
     }
-    
+
     mapTooltip.transition().duration(0).style("opacity", .9);
     mapTooltip.html(d_feature.properties.name || "N/A")
         .style("left", (event.pageX + 15) + "px")
@@ -446,7 +456,7 @@ function handleCountryClick(event, d_feature) {
     }
 
     const element = d3.select(this);
-    
+
     if (element.classed("selected-country")) {
         // Deselect country
         element.classed("selected-country", false);
@@ -454,7 +464,11 @@ function handleCountryClick(event, d_feature) {
         element.attr("fill", `${regionColor}22`);
         selectedCountry = null;
         mapSvg.select("g#flow-lines").selectAll("*").remove();
-        
+
+        // Clear flow data and hide flow control
+        currentFlowData = null;
+        hideFlowControl();
+
         // Show global line chart when deselecting country
         showGlobalLineChart();
     } else {
@@ -462,16 +476,16 @@ function handleCountryClick(event, d_feature) {
         const regionColor = regionColorScale(country.region_id);
         mapSvg.selectAll("path.country-shape")
             .classed("selected-country", false)
-            .attr("fill", function(d) {
+            .attr("fill", function (d) {
                 const c = getCountryData(d);
                 return c && c.region_id === +selectedRegion ? `${regionColor}22` : "#f0e6d2";
             });
-        
+
         element.classed("selected-country", true)
             .attr("fill", "#ffb700");
-        
+
         selectedCountry = d_feature;
-        
+
         if (typeof handleCountrySelection === "function") {
             handleCountrySelection(d_feature);
         }
@@ -525,9 +539,6 @@ function createCurvedPath(source, target, useClockwiseArc) {
 }
 
 function drawFlowsForRegion(regionId) {
-    const flowLinesGroup = mapSvg.select("g#flow-lines");
-    flowLinesGroup.selectAll("*").remove();
-
     const selectedRegionIdNum = +regionId;
 
     // Aggregate flows by the other region
@@ -570,7 +581,7 @@ function drawFlowsForRegion(regionId) {
             const cData = getCountryData(f); // Use existing getCountryData
             return cData && cData.country_id === country.country_id;
         });
-        
+
         if (countryFeature) {
             const centroid = mapPathGenerator.centroid(countryFeature);
             if (!isNaN(centroid[0]) && !isNaN(centroid[1])) {
@@ -588,12 +599,14 @@ function drawFlowsForRegion(regionId) {
         if (region.count > 0) {
             region.x = region.sumX / region.count;
             region.y = region.sumY / region.count;
-        } else { region.x = 0; region.y = 0;}
+        } else { region.x = 0; region.y = 0; }
     });
 
     const regionIdToName = new Map(allData.regions.map(r => [r.region_id, r.region_name]));
     const selectedRegionName = regionIdToName.get(selectedRegionIdNum) || `Region ${selectedRegionIdNum}`;
 
+    // Prepare flow data for filtering
+    const preparedFlows = [];
     flowsByOtherRegion.forEach(aggFlow => {
         const otherRegionName = regionIdToName.get(aggFlow.otherRegionId) || `Region ${aggFlow.otherRegionId}`;
         const outflowVal = aggFlow.outflow;
@@ -620,50 +633,45 @@ function drawFlowsForRegion(regionId) {
 
         const pathSourceCoords = dominantIsOutflow ? selectedCentroid : otherCentroid;
         const pathTargetCoords = dominantIsOutflow ? otherCentroid : selectedCentroid;
-        
+
         // Consistent curve based on region IDs
         const useClockwiseArc = selectedRegionIdNum < aggFlow.otherRegionId;
 
-        const pathData = {
+        const strokeWidth = Math.max(0.75, Math.log10(pathValue + 1) / 1.2);
+        const strokeColor = dominantIsOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)";
+        const markerEnd = dominantIsOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)";
+        const pathD = createCurvedPath(pathSourceCoords, pathTargetCoords, useClockwiseArc);
+        const tooltipText = `<b>${selectedRegionName} → ${otherRegionName}:</b> ${outflowVal.toLocaleString()}<br>` +
+            `<b>${otherRegionName} → ${selectedRegionName}:</b> ${inflowVal.toLocaleString()}`;
+
+        preparedFlows.push({
             selectedEntityName: selectedRegionName,
             otherEntityName: otherRegionName,
-            outflowDisplayValue: outflowVal, // From selected to other
-            inflowDisplayValue: inflowVal,   // From other to selected
+            outflowDisplayValue: outflowVal,
+            inflowDisplayValue: inflowVal,
             valueForStroke: pathValue,
-            dominantIsOutflow: dominantIsOutflow // For color/arrow: true if selected -> other is dominant
-        };
-
-        flowLinesGroup.append("path")
-            .datum(pathData)
-            .attr("d", () => createCurvedPath(pathSourceCoords, pathTargetCoords, useClockwiseArc))
-            .attr("fill", "none")
-            .attr("stroke", d => d.dominantIsOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)")
-            .attr("stroke-opacity", 0.7)
-            .attr("stroke-width", d => Math.max(0.75, Math.log10(d.valueForStroke + 1) / 1.2))
-            .attr("marker-end", d => d.dominantIsOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
-            .style("pointer-events", "all")
-            .classed("flow-line", true)
-            .on("mouseover", (event, d) => {
-                d3.select(event.currentTarget).attr("stroke-opacity", 1).attr("stroke-width", Math.max(1.5, Math.log10(d.valueForStroke + 1)));
-                mapTooltip.transition().duration(200).style("opacity", .9);
-                const tooltipText = `<b>${d.selectedEntityName} → ${d.otherEntityName}:</b> ${d.outflowDisplayValue.toLocaleString()}<br>` +
-                                  `<b>${d.otherEntityName} → ${d.selectedEntityName}:</b> ${d.inflowDisplayValue.toLocaleString()}`;
-                mapTooltip.html(tooltipText)
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY - 10) + "px");
-            })
-            .on("mouseout", (event, d) => {
-                d3.select(event.currentTarget).attr("stroke-opacity", 0.7).attr("stroke-width", Math.max(0.75, Math.log10(d.valueForStroke + 1) / 1.2));
-                mapTooltip.transition().duration(200).style("opacity", 0);
-            });
+            dominantIsOutflow: dominantIsOutflow,
+            pathD: pathD,
+            strokeColor: strokeColor,
+            strokeWidth: strokeWidth,
+            markerEnd: markerEnd,
+            tooltipText: tooltipText
+        });
     });
+
+    // Store the data for slider updates
+    currentFlowData = preparedFlows;
+
+    // Show flow control and update max
+    showFlowControl();
+    updateFlowControlMax(preparedFlows.length);
+
+    // Draw filtered flows
+    drawFilteredFlows(preparedFlows, 'region');
 }
 
 
 function drawFlowsForSelectedCountry(selectedMapFeature) {
-    const flowLinesGroup = mapSvg.select("g#flow-lines");
-    flowLinesGroup.selectAll("*").remove();
-
     if (!mapCountryDataCache || !mapFlowDataCache) return;
 
     const mapCountryName = selectedMapFeature.properties.name;
@@ -679,7 +687,8 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
         if (isNaN(centroid[0]) || isNaN(centroid[1])) throw new Error("Centroid NaN.");
         selectedCountryCentroidCoords = { x: centroid[0], y: centroid[1] };
     } catch (e) {
-        console.error(`Error calculating centroid for ${mapCountryName}:`, e); return;
+        console.error(`Error calculating centroid for ${mapCountryName}:`, e);
+        return;
     }
 
     // Aggregate flows by other country
@@ -700,7 +709,7 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
         } else {
             return; // Skip self-loops or irrelevant flows
         }
-        
+
         const otherCountryCSV = mapCountryDataCache.find(c => c.country_id === otherCountryId);
         if (!otherCountryCSV) return;
 
@@ -719,6 +728,8 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
         }
     });
 
+    // Prepare flow data for filtering
+    const preparedFlows = [];
     flowsByOtherCountry.forEach(aggFlow => {
         const otherCountryCSV = aggFlow.otherCountryCSV;
         const outflowVal = aggFlow.outflow;
@@ -739,7 +750,8 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
             if (isNaN(centroid[0]) || isNaN(centroid[1])) throw new Error("Target centroid NaN.");
             otherCountryCentroidCoords = { x: centroid[0], y: centroid[1] };
         } catch (e) {
-            console.error(`Error getting centroid for ${otherCountryCSV.country_name}:`, e); return;
+            console.error(`Error getting centroid for ${otherCountryCSV.country_name}:`, e);
+            return;
         }
 
         let dominantIsOutflow; // True if dominant flow is from selected country to other country
@@ -754,46 +766,43 @@ function drawFlowsForSelectedCountry(selectedMapFeature) {
         }
         if (pathValue === 0) return;
 
-
         const pathSourceCoords = dominantIsOutflow ? selectedCountryCentroidCoords : otherCountryCentroidCoords;
         const pathTargetCoords = dominantIsOutflow ? otherCountryCentroidCoords : selectedCountryCentroidCoords;
 
         // Consistent curve based on country IDs
         const useClockwiseArc = selectedCountryIdNum < otherCountryCSV.country_id;
 
-        const pathData = {
+        const strokeWidth = Math.max(0.75, Math.log10(pathValue + 1) / 1.2);
+        const strokeColor = dominantIsOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)";
+        const markerEnd = dominantIsOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)";
+        const pathD = createCurvedPath(pathSourceCoords, pathTargetCoords, useClockwiseArc);
+        const tooltipText = `<b>${selectedCountryCSV.country_name} → ${otherCountryCSV.country_name}:</b> ${outflowVal.toLocaleString()}<br>` +
+            `<b>${otherCountryCSV.country_name} → ${selectedCountryCSV.country_name}:</b> ${inflowVal.toLocaleString()}`;
+
+        preparedFlows.push({
             selectedEntityName: selectedCountryCSV.country_name,
             otherEntityName: otherCountryCSV.country_name,
-            outflowDisplayValue: outflowVal, // From selected to other
-            inflowDisplayValue: inflowVal,   // From other to selected
+            outflowDisplayValue: outflowVal,
+            inflowDisplayValue: inflowVal,
             valueForStroke: pathValue,
-            dominantIsOutflow: dominantIsOutflow // For color/arrow: true if selected -> other is dominant
-        };
-
-        flowLinesGroup.append("path")
-            .datum(pathData)
-            .attr("d", () => createCurvedPath(pathSourceCoords, pathTargetCoords, useClockwiseArc))
-            .attr("fill", "none")
-            .attr("stroke", d => d.dominantIsOutflow ? "rgb(200,0,0)" : "rgb(0,100,0)")
-            .attr("stroke-opacity", 0.7)
-            .attr("stroke-width", d => Math.max(0.75, Math.log10(d.valueForStroke + 1) / 1.2))
-            .attr("marker-end", d => d.dominantIsOutflow ? "url(#arrowhead-out)" : "url(#arrowhead-in)")
-            .style("pointer-events", "all")
-            .classed("flow-line", true)
-            .on("mouseover", (event, d) => {
-                d3.select(event.currentTarget).attr("stroke-opacity", 1).attr("stroke-width", Math.max(1.5, Math.log10(d.valueForStroke + 1)));
-                mapTooltip.transition().duration(200).style("opacity", .9);
-                const tooltipText = `<b>${d.selectedEntityName} → ${d.otherEntityName}:</b> ${d.outflowDisplayValue.toLocaleString()}<br>` +
-                                  `<b>${d.otherEntityName} → ${d.selectedEntityName}:</b> ${d.inflowDisplayValue.toLocaleString()}`;
-                mapTooltip.html(tooltipText)
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY - 10) + "px");
-            })
-            .on("mouseout", (event, d) => {
-                d3.select(event.currentTarget).attr("stroke-opacity", 0.7).attr("stroke-width", Math.max(0.75, Math.log10(d.valueForStroke + 1) / 1.2));
-                mapTooltip.transition().duration(200).style("opacity", 0);
-            });
+            dominantIsOutflow: dominantIsOutflow,
+            pathD: pathD,
+            strokeColor: strokeColor,
+            strokeWidth: strokeWidth,
+            markerEnd: markerEnd,
+            tooltipText: tooltipText
+        });
     });
+
+    // Store the data for slider updates
+    currentFlowData = preparedFlows;
+
+    // Show flow control and update max
+    showFlowControl();
+    updateFlowControlMax(preparedFlows.length);
+
+    // Draw filtered flows
+    drawFilteredFlows(preparedFlows, 'country');
 }
 
 
@@ -804,7 +813,7 @@ function handleOceanClick() {
         const regionElement = mapSvg.select(`path.region-shape[data-region-id="${selectedRegion}"]`);
         handleRegionClick(selectedRegion, regionElement.node(), regionColorScale(selectedRegion));
     }
-    
+
     // Deselect any selected country
     if (selectedCountry) {
         selectedCountry = null;
@@ -813,6 +822,10 @@ function handleOceanClick() {
             .attr("fill", "#f0e6d2");
         mapSvg.select("g#flow-lines").selectAll("*").remove();
     }
+
+    // Clear flow data and hide flow control
+    currentFlowData = null;
+    hideFlowControl();
 
     // Show global line chart
     showGlobalLineChart();
@@ -823,5 +836,93 @@ function showGlobalLineChart() {
         initLineChart(mapFlowDataCache, mapCountryDataCache);
     }
     d3.select("#explanation-box").style("display", "none");
+}
+
+// Flow control functions
+function setupFlowControlSlider() {
+    const slider = d3.select("#arrow-count-slider");
+    const currentCountSpan = d3.select("#current-arrow-count");
+    const maxCountSpan = d3.select("#max-arrow-count");
+
+    slider.on("input", function () {
+        maxArrowCount = +this.value;
+        currentCountSpan.text(maxArrowCount);
+
+        // Re-render flows if there's an active selection
+        if (selectedCountry && currentFlowData) {
+            drawFilteredFlows(currentFlowData, 'country');
+        } else if (selectedRegion && currentFlowData) {
+            drawFilteredFlows(currentFlowData, 'region');
+        }
+    });
+}
+
+function showFlowControl() {
+    d3.select("#flow-control").style("display", "block");
+}
+
+function hideFlowControl() {
+    d3.select("#flow-control").style("display", "none");
+}
+
+function updateFlowControlMax(totalFlows) {
+    const slider = d3.select("#arrow-count-slider");
+    const maxCountSpan = d3.select("#max-arrow-count");
+
+    slider.attr("max", totalFlows);
+    maxCountSpan.text(totalFlows);
+
+    // Ensure current value doesn't exceed max
+    const currentValue = +slider.property("value");
+    if (currentValue > totalFlows) {
+        slider.property("value", totalFlows);
+        maxArrowCount = totalFlows;
+        d3.select("#current-arrow-count").text(totalFlows);
+    }
+}
+
+function drawFilteredFlows(flowsData, type) {
+    const flowLinesGroup = mapSvg.select("g#flow-lines");
+    flowLinesGroup.selectAll("*").remove();
+
+    // Sort flows by value (largest first) and take only the top N
+    const sortedFlows = flowsData.sort((a, b) => b.valueForStroke - a.valueForStroke);
+    const filteredFlows = sortedFlows.slice(0, maxArrowCount);
+
+    // Draw the filtered flows
+    filteredFlows.forEach(flowData => {
+        drawSingleFlow(flowData, flowLinesGroup);
+    });
+
+    // Update current count display
+    d3.select("#current-arrow-count").text(Math.min(maxArrowCount, flowsData.length));
+}
+
+function drawSingleFlow(pathData, flowLinesGroup) {
+    flowLinesGroup.append("path")
+        .datum(pathData)
+        .attr("d", pathData.pathD)
+        .attr("fill", "none")
+        .attr("stroke", pathData.strokeColor)
+        .attr("stroke-opacity", 0.7)
+        .attr("stroke-width", pathData.strokeWidth)
+        .attr("marker-end", pathData.markerEnd)
+        .style("pointer-events", "all")
+        .classed("flow-line", true)
+        .on("mouseover", (event, d) => {
+            d3.select(event.currentTarget)
+                .attr("stroke-opacity", 1)
+                .attr("stroke-width", Math.max(1.5, Math.log10(d.valueForStroke + 1)));
+            mapTooltip.transition().duration(200).style("opacity", .9);
+            mapTooltip.html(d.tooltipText)
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 10) + "px");
+        })
+        .on("mouseout", (event, d) => {
+            d3.select(event.currentTarget)
+                .attr("stroke-opacity", 0.7)
+                .attr("stroke-width", d.strokeWidth);
+            mapTooltip.transition().duration(200).style("opacity", 0);
+        });
 }
 
